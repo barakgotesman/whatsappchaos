@@ -59,6 +59,7 @@ class TraceStore {
   /** True only when URL has ?dev=1. Computed once at startup. */
   private readonly devMode: boolean
 
+
   private events: EventTraceEntry[] = []
   private residents: ResidentTraceEntry[] = []
   private llmCalls: LLMTraceEntry[] = []

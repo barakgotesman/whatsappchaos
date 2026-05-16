@@ -136,12 +136,21 @@ export function ChatWindow({ messages, onSendMessage, disabled, playerSendCount 
   const viewportRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Scroll to bottom only when the player sends — never on incoming resident messages
+  // Scroll to bottom when the player sends — always jumps down so the reply is visible
   useEffect(() => {
     if (playerSendCount === 0) return
     const viewport = viewportRef.current
     if (viewport) viewport.scrollTop = viewport.scrollHeight
   }, [playerSendCount])
+
+  // Scroll to bottom on new resident messages only if the user is already near the bottom.
+  // If they've scrolled up to read history, leave them alone.
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const distFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
+    if (distFromBottom < 120) viewport.scrollTop = viewport.scrollHeight
+  }, [messages.length])
 
   // Resize textarea height to fit content, capped at 6 rows
   function resizeTextarea() {
@@ -204,7 +213,7 @@ export function ChatWindow({ messages, onSendMessage, disabled, playerSendCount 
             onKeyDown={handleKeyDown}
             disabled={disabled}
             rows={1}
-            placeholder={disabled ? "המשחק הסתיים" : "Type a message"}
+            placeholder={disabled ? "המשחק הסתיים" : "הקלד הודעה"}
             className="wa-textarea"
           />
         </div>

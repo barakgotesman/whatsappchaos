@@ -158,6 +158,7 @@ export default function App() {
 
     // 2. Analyze the player's message and apply game effects
     const stateSnapshot = afterPlayer
+    const analyzeStart = Date.now()
     analyzeMessage({
       callType: "analyze",
       playerMessage: text,
@@ -176,7 +177,7 @@ export default function App() {
         parsed: result.action,
         success: !result.fallbackUsed,
         fallbackUsed: result.fallbackUsed,
-        latencyMs: 0,  // latency tracked server-side
+        latencyMs: Date.now() - analyzeStart,
         tick: stateSnapshot.tick,
       })
 

@@ -115,9 +115,23 @@ export async function analyzeMessage(
   }
 }
 
-/** Client-side fallback message when the server is unreachable */
-function clientFallbackMessage(residentId: string, eventType: string): string {
-  return `[${residentId}]: הגיב על ${eventType}`
+/** Client-side fallback message when the server is unreachable (network failure) */
+function clientFallbackMessage(_residentId: string, eventType: string): string {
+  const fallbacks: Record<string, string> = {
+    noise_complaint:       "מה הרעש הזה?? אי אפשר לנוח בשקט",
+    renovation_noise:      "שוב עובדים?! עד מתי זה יימשך",
+    water_leak:            "יש דליפה? מישהו כבר טיפל בזה?",
+    power_outage:          "חשמל יש? אצלי חשוך לגמרי",
+    elevator_broken:       "המעלית שוב לא עובדת... כמה פעמים כבר",
+    parking_dispute:       "מי חנה שוב במקום שלי?!",
+    pet_complaint:         "הכלב הזה שוב מפריע לכולם",
+    cleanliness_complaint: "הלובי שוב מלוכלך, מי אחראי פה",
+    public_accusation:     "מחפשים אשמים כרגיל במקום לפתור",
+    support_signal:        "נכון, גם אני חושב בדיוק ככה",
+    no_confidence_signal:  "לא בטוח שאנחנו בידיים טובות כרגע",
+    rumor_spread:          "שמעתם מה אומרים? יש פה סיפור",
+  }
+  return fallbacks[eventType] ?? "יש מה לדון פה בקבוצה"
 }
 
 /** Fallback action used when LLM analysis is unavailable */

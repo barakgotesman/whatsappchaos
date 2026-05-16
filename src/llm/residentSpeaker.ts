@@ -22,6 +22,10 @@ const MIN_RESIDENT_COOLDOWN_MS = 30000
 /** Timestamp of the last resident message sent — enforces MIN_MESSAGE_GAP_MS */
 let lastMessageAt = 0
 
+/** True while an LLM generate call is in flight — prevents concurrent Groq requests
+ *  that would burst the rate limit and cause all of them to fail */
+let inFlight = false
+
 /** Per-resident last-spoke timestamps — enforces MIN_RESIDENT_COOLDOWN_MS */
 const residentLastSpokeAt = new Map<string, number>()
 
@@ -44,32 +48,40 @@ export async function generateResidentMessages(
 ): Promise<ChatMessage[]> {
   // Enforce minimum gap — skip unless forceSpeak is set
   if (!forceSpeak && Date.now() - lastMessageAt < MIN_MESSAGE_GAP_MS) return []
+  // Skip if a call is already in flight — prevents concurrent Groq requests that burst the rate limit.
+  // forceSpeak bypasses this so the player always gets a reply even if a tick call is in progress.
+  if (!forceSpeak && inFlight) return []
 
-  const speakers = selectSpeakers(events, residents, state, forceSpeak)
-  if (speakers.length === 0) return []
+  inFlight = true
+  try {
+    const speakers = selectSpeakers(events, residents, state, forceSpeak)
+    if (speakers.length === 0) return []
 
-  // MAX_SPEAKERS_PER_TICK is 1 so there is always exactly one call
-  const settled = await Promise.allSettled(
-    speakers.map(({ resident, event }) =>
-      generateForResident(resident, event, state, residents),
-    ),
-  )
+    // MAX_SPEAKERS_PER_TICK is 1 so there is always exactly one call
+    const settled = await Promise.allSettled(
+      speakers.map(({ resident, event }) =>
+        generateForResident(resident, event, state, residents),
+      ),
+    )
 
-  const messages: ChatMessage[] = []
-  for (const result of settled) {
-    if (result.status === "fulfilled" && result.value) {
-      messages.push(result.value)
+    const messages: ChatMessage[] = []
+    for (const result of settled) {
+      if (result.status === "fulfilled" && result.value) {
+        messages.push(result.value)
+      }
     }
-  }
 
-  if (messages.length > 0) {
-    lastMessageAt = Date.now()
-    // Record per-resident cooldown so they don't speak again immediately
-    for (const msg of messages) {
-      residentLastSpokeAt.set(msg.senderId, lastMessageAt)
+    if (messages.length > 0) {
+      lastMessageAt = Date.now()
+      // Record per-resident cooldown so they don't speak again immediately
+      for (const msg of messages) {
+        residentLastSpokeAt.set(msg.senderId, lastMessageAt)
+      }
     }
+    return messages
+  } finally {
+    inFlight = false
   }
-  return messages
 }
 
 // ─── Speaker selection ────────────────────────────────────────

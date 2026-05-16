@@ -78,9 +78,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (body.callType === "generate") {
       const result = await handleGenerate(body, apiKey)
+      // Propagate critical Groq errors (rate limit, auth) so the client circuit breaker trips
+      if (result.groqStatus) return res.status(result.groqStatus).json({ error: "Groq error" })
       return res.status(200).json(result)
     } else if (body.callType === "analyze") {
       const result = await handleAnalyze(body, apiKey)
+      if (result.groqStatus) return res.status(result.groqStatus).json({ error: "Groq error" })
       return res.status(200).json(result)
     } else {
       return res.status(400).json({ error: "Unknown callType" })
@@ -104,16 +107,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 async function handleGenerate(
   req: GenerateMessageRequest,
   apiKey: string
-): Promise<GenerateMessageResponse> {
+): Promise<GenerateMessageResponse & { groqStatus?: number }> {
   const userPrompt = buildGeneratePrompt(req)
 
   const groqResponse = await callGroq(GENERATE_SYSTEM_PROMPT, userPrompt, apiKey, false)
 
   if (!groqResponse.ok) {
-    return {
-      message: generateFallbackMessage(req.residentId, req.eventType),
-      fallbackUsed: true,
+    // Surface critical Groq errors (429 rate limit, 401 bad key) to the client
+    // so the circuit breaker can trip and the game shows a proper error screen.
+    if (groqResponse.status && groqResponse.status >= 400) {
+      return { message: "", fallbackUsed: true, groqStatus: groqResponse.status }
     }
+    return { message: generateFallbackMessage(req.residentId, req.eventType), fallbackUsed: true }
   }
 
   const message = groqResponse.text.trim()
@@ -150,11 +155,25 @@ Write your WhatsApp message now. React specifically to that last message — agr
 }
 
 /**
- * Returns a simple Hebrew fallback message when Groq is unavailable.
- * Keeps the game running even without LLM access.
+ * Returns a generic Hebrew message per event type when Groq is unavailable.
+ * These read like real WhatsApp messages so the game stays immersive even in degraded mode.
  */
-function generateFallbackMessage(residentId: string, eventType: string): string {
-  return `[${residentId}]: הגיב על ${eventType}`
+function generateFallbackMessage(_residentId: string, eventType: string): string {
+  const fallbacks: Record<string, string> = {
+    noise_complaint:       "מה הרעש הזה?? אי אפשר לנוח בשקט",
+    renovation_noise:      "שוב עובדים?! עד מתי זה יימשך",
+    water_leak:            "יש דליפה? מישהו כבר טיפל בזה?",
+    power_outage:          "חשמל יש? אצלי חשוך לגמרי",
+    elevator_broken:       "המעלית שוב לא עובדת... כמה פעמים כבר",
+    parking_dispute:       "מי חנה שוב במקום שלי?!",
+    pet_complaint:         "הכלב הזה שוב מפריע לכולם",
+    cleanliness_complaint: "הלובי שוב מלוכלך, מי אחראי פה",
+    public_accusation:     "מחפשים אשמים כרגיל במקום לפתור",
+    support_signal:        "נכון, גם אני חושב בדיוק ככה",
+    no_confidence_signal:  "לא בטוח שאנחנו בידיים טובות כרגע",
+    rumor_spread:          "שמעתם מה אומרים? יש פה סיפור",
+  }
+  return fallbacks[eventType] ?? "יש מה לדון פה בקבוצה"
 }
 
 // ─── Analyze handler ──────────────────────────────────────────
@@ -169,16 +188,16 @@ function generateFallbackMessage(residentId: string, eventType: string): string 
 async function handleAnalyze(
   req: AnalyzePlayerMessageRequest,
   apiKey: string
-): Promise<AnalyzePlayerMessageResponse> {
+): Promise<AnalyzePlayerMessageResponse & { groqStatus?: number }> {
   const userPrompt = buildAnalyzePrompt(req)
 
   const groqResponse = await callGroq(ANALYZE_SYSTEM_PROMPT, userPrompt, apiKey, true)
 
   if (!groqResponse.ok) {
-    return {
-      action: buildAmbiguousFallback(req.playerMessage),
-      fallbackUsed: true,
+    if (groqResponse.status && groqResponse.status >= 400) {
+      return { action: buildAmbiguousFallback(req.playerMessage), fallbackUsed: true, groqStatus: groqResponse.status }
     }
+    return { action: buildAmbiguousFallback(req.playerMessage), fallbackUsed: true }
   }
 
   try {
@@ -232,8 +251,9 @@ function buildAmbiguousFallback(rawMessage: string): PlayerAction {
 // ─── Groq API call ────────────────────────────────────────────
 
 interface GroqResult {
-  ok: boolean  // false if request failed or non-2xx status
-  text: string // response content, empty string on failure
+  ok: boolean     // false if request failed or non-2xx status
+  text: string    // response content, empty string on failure
+  status?: number // HTTP status from Groq when not ok (e.g. 429, 401)
 }
 
 /**
@@ -277,7 +297,8 @@ async function callGroq(
 
     if (!response.ok) {
       console.error("[groq api] Non-2xx response:", response.status)
-      return { ok: false, text: "" }
+      // Preserve the status so the client's circuit breaker can see rate-limit (429) errors
+      return { ok: false, text: "", status: response.status }
     }
 
     const data = await response.json() as {

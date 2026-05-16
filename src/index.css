@@ -205,8 +205,10 @@
     white-space: pre-wrap;
   }
 
-  .wa-bubble--in  { background: var(--c-bubble-in);  border-radius: 0 12px 12px 12px; }
-  .wa-bubble--out { background: var(--c-bubble-out); border-radius: 12px 0 12px 12px; }
+  /* RTL layout: resident bubbles sit on visual-left so tail is top-right (no top-right radius).
+     Player bubbles sit on visual-right so tail is top-left (no top-left radius). */
+  .wa-bubble--in  { background: var(--c-bubble-in);  border-radius: 12px 0 12px 12px; }
+  .wa-bubble--out { background: var(--c-bubble-out); border-radius: 0 12px 12px 12px; }
 
   .wa-bubble-time {
     @apply flex items-center gap-1 mt-1;
