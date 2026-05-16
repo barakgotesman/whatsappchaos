@@ -6,7 +6,6 @@ import { StatusBar } from "@/components/StatusBar"
 import { ChatWindow } from "@/components/ChatWindow"
 import { ResidentPanel } from "@/components/ResidentPanel"
 import { trace } from "@/dev/traceStore"
-import { DEV_SEED_MESSAGES } from "@/dev/devSeeds"
 import { DevInjectButton } from "@/components/dev/DevInjectButton"
 import { DevBadge } from "@/components/dev/DevBadge"
 import { DevPanel } from "@/components/dev/DevPanel"
@@ -27,6 +26,8 @@ export default function App() {
   const [devPanelOpen, setDevPanelOpen]       = useState(false)
   // Set to true when the LLM circuit opens — pauses the engine and shows a fatal error screen
   const [llmFatal, setLlmFatal]               = useState(false)
+  // Incremented each time the player sends — ChatWindow uses this to trigger scroll-to-bottom
+  const [playerSendCount, setPlayerSendCount] = useState(0)
 
   const engineRef    = useRef<SimulationEngine | null>(null)
   // Ref mirror of isRunning so the onTick closure always sees the current value
@@ -57,11 +58,6 @@ export default function App() {
     // Push initial snapshot before first tick so UI renders immediately.
     // Private field access via cast — isolated to this one-time init.
     const eng = engine as unknown as { state: BuildingState; residents: Resident[] }
-
-    // In dev mode, seed the chat with fake messages so the UI is immediately testable.
-    if (trace.isDevMode()) {
-      eng.state.chatMessages = [...DEV_SEED_MESSAGES]
-    }
 
     engine.onTick!(structuredClone(eng.state), structuredClone(eng.residents), [])
   }, [])
@@ -158,6 +154,7 @@ export default function App() {
     }
     const afterPlayer = engine.injectChatMessages([msg])
     setBuildingState(afterPlayer)
+    setPlayerSendCount((c) => c + 1)
 
     // 2. Analyze the player's message and apply game effects
     const stateSnapshot = afterPlayer
@@ -233,6 +230,8 @@ export default function App() {
           <StatusBar
             state={buildingState}
             onGroupNameClick={() => setShowGroupInfo(true)}
+            isRunning={isRunning}
+            onTogglePause={isRunning ? handlePause : handleStart}
           />
         )}
 
@@ -242,6 +241,7 @@ export default function App() {
             messages={buildingState.chatMessages}
             onSendMessage={handleSendMessage}
             disabled={isGameOver || llmFatal}
+            playerSendCount={playerSendCount}
           />
         )}
 
@@ -265,21 +265,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Pause pill */}
-        {isRunning && !isGameOver && !showGroupInfo && (
-          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30">
-            <Button
-              onClick={handlePause}
-              variant="ghost"
-              size="sm"
-              className="wa-pause-btn"
-            >
-              השהה
-            </Button>
-          </div>
-        )}
-
-        {/* LLM fatal error overlay — shown when the circuit breaker opens */}
+{/* LLM fatal error overlay — shown when the circuit breaker opens */}
         {llmFatal && (
           <div className="wa-gameover">
             <div className="wa-gameover-card">

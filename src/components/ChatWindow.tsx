@@ -121,31 +121,27 @@ interface ChatWindowProps {
   messages: ChatMessage[]
   onSendMessage: (text: string) => void
   disabled: boolean
+  /** Bumped by the parent each time the player sends — triggers a scroll-to-bottom */
+  playerSendCount: number
 }
-
-// How far from the bottom (px) before we consider the user "at the bottom"
-const SCROLL_THRESHOLD = 80
 
 /**
  * WhatsApp chat feed + input bar, living inside the iPhone frame.
  * Auto-scroll only fires when the user is already near the bottom —
  * scrolling up to read history will not be interrupted.
  */
-export function ChatWindow({ messages, onSendMessage, disabled }: ChatWindowProps) {
+export function ChatWindow({ messages, onSendMessage, disabled, playerSendCount }: ChatWindowProps) {
   const [draft, setDraft] = useState("")
   // Ref to the shadcn ScrollArea's inner viewport div
   const viewportRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // After each new message, scroll to bottom only if user is already near it
+  // Scroll to bottom only when the player sends — never on incoming resident messages
   useEffect(() => {
+    if (playerSendCount === 0) return
     const viewport = viewportRef.current
-    if (!viewport) return
-    const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
-    if (distanceFromBottom <= SCROLL_THRESHOLD) {
-      viewport.scrollTop = viewport.scrollHeight
-    }
-  }, [messages])
+    if (viewport) viewport.scrollTop = viewport.scrollHeight
+  }, [playerSendCount])
 
   // Resize textarea height to fit content, capped at 6 rows
   function resizeTextarea() {
@@ -162,11 +158,9 @@ export function ChatWindow({ messages, onSendMessage, disabled }: ChatWindowProp
     onSendMessage(text)
     setDraft("")
     inputRef.current?.focus()
-    // Reset height after clearing draft
+    // Reset textarea height after clearing draft
     requestAnimationFrame(() => {
       if (inputRef.current) inputRef.current.style.height = "auto"
-      const viewport = viewportRef.current
-      if (viewport) viewport.scrollTop = viewport.scrollHeight
     })
   }
 
