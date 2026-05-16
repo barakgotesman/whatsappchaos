@@ -10,4 +10,8 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'), // allows imports like @/components/...
     },
   },
+  test: {
+    environment: 'node',
+    globals: true,
+  },
 })

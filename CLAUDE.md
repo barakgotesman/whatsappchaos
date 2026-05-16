@@ -158,12 +158,14 @@ See `docs/models/resident.md` for full schema. Each has a `personaDescription` f
 - [x] `.env.example`, `.gitignore`, git remote connected
 - [x] `@` path alias wired in vite + tsconfig, zero TypeScript errors
 
-### M2 — Simulation Engine
-- [ ] `engine.ts` tick loop (setInterval, pause/resume)
-- [ ] `eventGenerator.ts` — threshold-based event creation
-- [ ] `residentAI.ts` — rule-based reactions per personality
-- [ ] `escalation.ts` — conflict resolution, alliance formation
-- [ ] Unit tests for simulation (Vitest)
+### M2 — Simulation Engine ✅
+- [x] `engine.ts` tick loop (setInterval, pause/resume)
+- [x] `eventGenerator.ts` — threshold-based event creation
+- [x] `residentAI.ts` — rule-based reactions per personality
+- [x] `escalation.ts` — conflict resolution, alliance formation
+- [x] Unit tests for simulation (Vitest) — 39 tests, all passing
+- [x] `src/constants.ts` — all union-type string literals centralized (EVENT_TYPE, ALLIANCE, SENTIMENT, PHASE, ARCHETYPE, REL_EVENT_TYPE)
+- [x] `reactionMultiplier` moved onto each resident definition (no archetype switch in logic)
 
 ### M3 — UI Shell
 - [ ] WhatsApp-style `ChatWindow` (shadcn ScrollArea)

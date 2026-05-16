@@ -1,4 +1,5 @@
 import type { Resident } from "@/types"
+import { ARCHETYPE, SENTIMENT } from "@/constants"
 
 /**
  * The 6 fixed residents of the building.
@@ -14,12 +15,14 @@ export const INITIAL_RESIDENTS: Resident[] = [
     id: "dov_5a",
     name: "דב מזרחי",
     apartment: "5A",
-    archetype: "angry_old_man",
+    archetype: ARCHETYPE.ANGRY_OLD_MAN,
 
     personaDescription: `דב בן 71, גר בדירה 5A כבר 40 שנה. הוא כותב בכיפס גדולות (CAPS LOCK), עם הרבה סימני קריאה!!!
 הוא תמיד מזכיר "הועד הישן שידע מה הוא עושה". מתלונן על רעש — במיוחד בשבת.
 משתמש בסלנג ישן ולפעמים כותב עברית מתועתקת. לא בטוח עם הטכנולוגיה — לפעמים שולח הודעה פעמיים.
 הוא רוגז מהר אבל מכבד סמכות אם היא מוצגת בנחרצות.`,
+
+    reactionMultiplier: 1.3, // escalates sharply — short fuse, long memory
 
     traits: {
       aggressiveness: 85,   // escalates very quickly
@@ -43,19 +46,21 @@ export const INITIAL_RESIDENTS: Resident[] = [
     isActive: true,
     isMuted: false,
     grievances: [],
-    currentSentiment: "skeptical",
+    currentSentiment: SENTIMENT.SKEPTICAL,
   },
 
   {
     id: "rivka_3b",
     name: "רבקה כהן",
     apartment: "3B",
-    archetype: "gossip",
+    archetype: ARCHETYPE.GOSSIP,
 
     personaDescription: `רבקה בת 55, פעילה מאוד בקבוצה — שולחת 5-10 הודעות לכל אירוע.
 משתמשת בהרבה אימוג'י 😮🤔💬. מנסחת את הרכילות שלה כדאגה: "לא אמרתי כלום אבל שמעתי ש..."
 יוצרת ושוברת ברית מהר מאוד. שואלת שאלות מובילות ולא נותנת תשובות ישירות.
 היא יודעת את עסקי כולם ומשתמשת בזה כנשק רך.`,
+
+    reactionMultiplier: 1.0, // average intensity — her power is volume, not rage
 
     traits: {
       aggressiveness: 40,
@@ -79,19 +84,21 @@ export const INITIAL_RESIDENTS: Resident[] = [
     isActive: true,
     isMuted: false,
     grievances: [],
-    currentSentiment: "neutral",
+    currentSentiment: SENTIMENT.NEUTRAL,
   },
 
   {
     id: "shmuel_1a",
     name: "שמואל לוי",
     apartment: "1A",
-    archetype: "peacemaker",
+    archetype: ARCHETYPE.PEACEMAKER,
 
     personaDescription: `שמואל בן 63, מנהל בית ספר בדימוס. מדבר במשפטים מלאים ומסודרים.
 תמיד מחפש את האמצע: "בואו נדבר בצורה מכובדת", "יש לכולם נקודה טובה".
 יתמוך בשחקן אם יפנה אליו בשקט, אבל מאבד סבלנות אם הכאוס חוזר שוב ושוב.
 לא אוהב לתקוף אבל יאמר את האמת ישירות אם נדרש.`,
+
+    reactionMultiplier: 0.4, // absorbs conflict — reacts gently even to bad events
 
     traits: {
       aggressiveness: 15,
@@ -115,19 +122,21 @@ export const INITIAL_RESIDENTS: Resident[] = [
     isActive: true,
     isMuted: false,
     grievances: [],
-    currentSentiment: "neutral",
+    currentSentiment: SENTIMENT.NEUTRAL,
   },
 
   {
     id: "noa_4c",
     name: "נועה & טל שפירו",
     apartment: "4C",
-    archetype: "young_couple",
+    archetype: ARCHETYPE.YOUNG_COUPLE,
 
     personaDescription: `נועה וטל, שניהם בני 32, גרים בבניין 8 חודשים. הם מחליפים מי כותב — לפעמים "נועה מכאן", לפעמים "טל כאן".
 מודרניים, משתמשים ברפרנסים לממים ולסדרות. תומכים ביוזמות ירוקות.
 מתגוננים אם מאשימים אותם ברעש ("זה לא אנחנו???").
 לא בטוחים בפוליטיקה של הבניין — קל מאוד להשפיע עליהם לכל כיוון.`,
+
+    reactionMultiplier: 1.0, // balanced — easily swayed but not explosive
 
     traits: {
       aggressiveness: 35,
@@ -151,19 +160,21 @@ export const INITIAL_RESIDENTS: Resident[] = [
     isActive: true,
     isMuted: false,
     grievances: [],
-    currentSentiment: "neutral",
+    currentSentiment: SENTIMENT.NEUTRAL,
   },
 
   {
     id: "miriam_2d",
     name: "מרים פרץ",
     apartment: "2D",
-    archetype: "suspicious_elder",
+    archetype: ARCHETYPE.SUSPICIOUS_ELDER,
 
     personaDescription: `מרים בת 68, אלמנה, גרה לבד. חשדנית מאוד כלפי כל מי שמקבל תפקיד סמכות חדש — מזכירה שערוריות של ועדים קודמים.
 כותבת לאט עם הרבה שגיאות כתיב שהיא לא מתקנת. דתייה — מזכירה שבת וחגים.
 שולחת הודעות קוליות שמופיעות כ"[הודעה קולית 🎤]" בטקסט.
 כדי לזכות באמונה שלה צריך זמן ועקביות — אבל אם תזכה בה, היא נאמנה מאוד.`,
+
+    reactionMultiplier: 1.1, // slightly elevated — suspicion amplifies every slight
 
     traits: {
       aggressiveness: 50,
@@ -187,20 +198,22 @@ export const INITIAL_RESIDENTS: Resident[] = [
     isActive: true,
     isMuted: false,
     grievances: [],
-    currentSentiment: "skeptical",
+    currentSentiment: SENTIMENT.SKEPTICAL,
   },
 
   {
     id: "yossi_6b",
     name: "יוסי אזולאי",
     apartment: "6B",
-    archetype: "hot_headed",
+    archetype: ARCHETYPE.HOT_HEADED,
 
     personaDescription: `יוסי בן 45, בעל עסק קטן. כותב מהר, משפטים קצרים, הרבה סימני קריאה.
 מתעצבן מהר אבל גם מתפייס מהר אם מראים לו כבוד.
 משתמש בסלנג מזרחי: "וואלה", "אחי", "על הראש שלי".
 מאיים ל"לקחת לבית משפט" באופן קבוע אבל לא עושה את זה.
 מכבד נחרצות וחוזק — אם השחקן מראה סמכות ברורה, יוסי ירגע.`,
+
+    reactionMultiplier: 1.5, // maximum volatility — spikes hard, cools fast
 
     traits: {
       aggressiveness: 80,
@@ -224,7 +237,7 @@ export const INITIAL_RESIDENTS: Resident[] = [
     isActive: true,
     isMuted: false,
     grievances: [],
-    currentSentiment: "neutral",
+    currentSentiment: SENTIMENT.NEUTRAL,
   },
 ]
 

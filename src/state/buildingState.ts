@@ -1,4 +1,5 @@
 import type { BuildingState } from "@/types"
+import { PHASE } from "@/constants"
 
 /**
  * The starting state of the building at tick 0.
@@ -10,7 +11,7 @@ export const INITIAL_BUILDING_STATE: BuildingState = {
   gameTimeElapsedSeconds: 0,
   gameDurationSeconds: 600, // 10 minutes default session
 
-  phase: "intro",
+  phase: PHASE.INTRO,
 
   // Building starts stable — will degrade over time
   noiseLevel: 20,
@@ -49,12 +50,12 @@ export function derivePhase(
   durationSeconds: number,
   chaosLevel: number
 ): BuildingState["phase"] {
-  if (elapsedSeconds < 30) return "intro"
+  if (elapsedSeconds < 30) return PHASE.INTRO
 
   const remainingSeconds = durationSeconds - elapsedSeconds
-  if (remainingSeconds <= 60) return "vote" // final minute = vote phase
+  if (remainingSeconds <= 60) return PHASE.VOTE  // final minute = vote phase
 
-  if (chaosLevel >= 70) return "crisis"
+  if (chaosLevel >= 70) return PHASE.CRISIS
 
-  return "tension"
+  return PHASE.TENSION
 }

@@ -71,6 +71,9 @@ export interface Resident {
   // ── Static personality ────────────────────────────────────
   traits: ResidentTraits
   sensitivities: ResidentSensitivities
+  /** Multiplier on all emotional reactions to events — set once at design time.
+   *  1.0 = baseline; >1 = amplified (hot-headed); <1 = dampened (peacemaker) */
+  reactionMultiplier: number
 
   // ── Dynamic state — mutated by simulation tick ────────────
   mood: MoodState
@@ -214,10 +217,19 @@ export type AllianceState =
   | "tense"     // underlying conflict, not yet erupted
   | "feuding"   // active conflict, amplify each other's anger
 
+/** The kind of historical interaction recorded between two residents */
+export type RelationshipEventType =
+  | "support"
+  | "disagreement"
+  | "accusation"
+  | "alliance_formed"
+  | "alliance_broken"
+  | "rumor"
+
 /** A historical event between two residents — stored for context */
 export interface RelationshipEvent {
   tick: number
-  type: "support" | "disagreement" | "accusation" | "alliance_formed" | "alliance_broken" | "rumor"
+  type: RelationshipEventType
   description: string
   trustDelta: number  // how much this shifted their trust
 }
