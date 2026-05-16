@@ -1,4 +1,5 @@
 import type { ChatMessage } from "@/types"
+import { SENDER_ID, PLAYER_DISPLAY_NAME } from "@/constants"
 
 /**
  * Fake chat messages for dev mode (?dev=1).
@@ -32,8 +33,8 @@ export const DEV_SEED_MESSAGES: ChatMessage[] = [
   },
   {
     id: "dev_player_1",
-    senderId: "player",
-    senderName: "אתה",
+    senderId: SENDER_ID.PLAYER,
+    senderName: PLAYER_DISPLAY_NAME,
     content: "שלום לכולם, אני מטפל בעניין. אבדוק מה קרה ואחזור אליכם",
     tick: 12,
     type: "player",
@@ -80,8 +81,8 @@ export const DEV_SEED_MESSAGES: ChatMessage[] = [
   },
   {
     id: "dev_player_2",
-    senderId: "player",
-    senderName: "אתה",
+    senderId: SENDER_ID.PLAYER,
+    senderName: PLAYER_DISPLAY_NAME,
     content: "יוסי, אגיע לבדוק את זה עכשיו. מרים, אשלח דו\"ח מסודר עד סוף השבוע",
     tick: 30,
     type: "player",

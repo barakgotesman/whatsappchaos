@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import type { ChatMessage } from "@/types"
@@ -182,7 +182,7 @@ export function ChatWindow({ messages, onSendMessage, disabled }: ChatWindowProp
   return (
     <>
       {/* Scrollable message feed — viewport ref needed for manual scroll control */}
-      <ScrollArea className="wa-chat" viewportRef={viewportRef}>
+      <ScrollArea className="wa-chat" viewportRef={viewportRef as React.RefObject<HTMLDivElement>}>
         <div className="wa-messages-inner">
           {messages.length === 0 && (
             <div className="wa-empty-state">הקבוצה עדיין שקטה...</div>

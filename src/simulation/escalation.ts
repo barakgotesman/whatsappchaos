@@ -69,8 +69,16 @@ export function resolve(
   // ── Passive decay — stability drifts toward chaos each tick ──
   deltas.stabilityDelta -= THRESHOLDS.STABILITY_DECAY_PER_TICK
 
+  // ── Chaos passive decay ───────────────────────────────────────
+  // Without this, chaos is a one-way ratchet: events push it up but nothing
+  // brings it back down between events. 1.0/tick gives a natural "resting point"
+  // and makes the first few minutes of play survivable.
+  deltas.chaosDelta -= 1.0
+
   // ── Aggregate anger → chaos ──────────────────────────────────
-  // Total anger across all residents pushes chaos up; happiness pushes it down
+  // Total anger across all residents pushes chaos up; happiness pushes it down.
+  // Only positive anger deltas count — passive decay (-2/tick baseline) should
+  // lower residents' anger, not directly pull chaos down (that's the decay above).
   let totalAngerDelta = 0
   let totalHappinessDelta = 0
   for (const reaction of reactions.values()) {

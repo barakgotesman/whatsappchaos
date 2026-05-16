@@ -90,7 +90,7 @@ export function react(
 function computeEventReaction(
   resident: Resident,
   event: SimulationEvent,
-  allResidents: Resident[],
+  _allResidents: Resident[],
   relationships: Relationship[],
 ): Partial<ResidentReaction> | null {
   const { sourceId, targetId, severity, type } = event

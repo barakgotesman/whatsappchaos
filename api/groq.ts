@@ -5,12 +5,12 @@ import type {
   GenerateMessageResponse,
   AnalyzePlayerMessageResponse,
   PlayerAction,
-} from "../src/types"
+} from "../src/types/index"
 
 // ─── Constants ────────────────────────────────────────────────
 
-/** Groq model — llama3-70b for quality, can switch to mixtral for speed */
-const GROQ_MODEL = "llama3-70b-8192"
+/** Groq model — llama-3.3-70b-versatile replaces the decommissioned llama3-70b-8192 */
+const GROQ_MODEL = "llama-3.3-70b-versatile"
 
 /** Groq API endpoint */
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"

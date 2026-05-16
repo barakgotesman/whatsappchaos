@@ -70,6 +70,19 @@ export const REL_EVENT_TYPE = {
   RUMOR:            "rumor",
 } as const satisfies Record<string, RelationshipEventType>
 
+// ─── Chat sender IDs ─────────────────────────────────────────
+/** Fixed senderId values for non-resident chat participants */
+export const SENDER_ID = {
+  PLAYER: "player",
+  SYSTEM: "system",
+} as const
+
+/** Display name shown in LLM context for the player — "Va'ad Bayit" in Hebrew */
+export const PLAYER_LLM_NAME = "ועד הבית"
+
+/** Display name shown in the chat UI for the player */
+export const PLAYER_DISPLAY_NAME = "אתה"
+
 // ─── Resident archetypes ──────────────────────────────────────
 export const ARCHETYPE = {
   ANGRY_OLD_MAN:    "angry_old_man",

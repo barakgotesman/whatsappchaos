@@ -185,6 +185,7 @@ export type EventType =
   | "pet_complaint"
   | "renovation_noise"
   | "public_accusation"
+  | "maintenance_fee_dispute"
   | "rumor_spread"
   | "alliance_formed"
   | "alliance_broken"

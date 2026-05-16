@@ -11,7 +11,8 @@ import { DevInjectButton } from "@/components/dev/DevInjectButton"
 import { DevBadge } from "@/components/dev/DevBadge"
 import { DevPanel } from "@/components/dev/DevPanel"
 import { generateResidentMessages } from "@/llm/residentSpeaker"
-import { analyzeMessage } from "@/llm/groqClient"
+import { analyzeMessage, isLlmCircuitOpen } from "@/llm/groqClient"
+import { SENDER_ID, PLAYER_DISPLAY_NAME, PLAYER_LLM_NAME } from "@/constants"
 
 /**
  * Root component — owns the engine singleton and snapshot state.
@@ -24,8 +25,12 @@ export default function App() {
   const [isRunning, setIsRunning]             = useState(false)
   const [showGroupInfo, setShowGroupInfo]     = useState(false)
   const [devPanelOpen, setDevPanelOpen]       = useState(false)
+  // Set to true when the LLM circuit opens — pauses the engine and shows a fatal error screen
+  const [llmFatal, setLlmFatal]               = useState(false)
 
-  const engineRef = useRef<SimulationEngine | null>(null)
+  const engineRef    = useRef<SimulationEngine | null>(null)
+  // Ref mirror of isRunning so the onTick closure always sees the current value
+  const isRunningRef = useRef(false)
 
   useEffect(() => {
     const engine = new SimulationEngine(3000)
@@ -70,14 +75,31 @@ export default function App() {
    * @param snapshotResidents - resident snapshot from this tick
    * @param snapshotState - building state snapshot from this tick
    */
+  /**
+   * Checks whether the LLM circuit breaker has opened after a call returns null.
+   * If it has, pauses the engine and sets the fatal error flag so the UI shows
+   * "Game not available" instead of silently degrading.
+   */
+  function checkLlmFatal(): void {
+    if (isLlmCircuitOpen()) {
+      engineRef.current?.pause()
+      isRunningRef.current = false
+      setIsRunning(false)
+      setLlmFatal(true)
+    }
+  }
+
   function triggerResidentSpeaking(
     events: SimulationEvent[],
     snapshotResidents: Resident[],
     snapshotState: BuildingState,
   ) {
+    // Never fire LLM calls before the player has pressed Start
+    if (!isRunningRef.current) return
     if (events.length === 0 && snapshotState.tick % 3 !== 0) return  // skip quiet ticks
 
     generateResidentMessages(events, snapshotResidents, snapshotState).then((messages) => {
+      if (isLlmCircuitOpen()) { checkLlmFatal(); return }
       if (!messages.length) return
       const newState = engineRef.current?.injectChatMessages(messages)
       if (newState) setBuildingState(newState)
@@ -93,8 +115,8 @@ export default function App() {
     if (eng.state.tick === 0) {
       const promoMsg: ChatMessage = {
         id: crypto.randomUUID(),
-        senderId: "system",
-        senderName: "system",
+        senderId: SENDER_ID.SYSTEM,
+        senderName: SENDER_ID.SYSTEM,
         content: "הוספת כמנהל קבוצה",   // "You were added as a group admin"
         tick: 0,
         type: "system",
@@ -104,11 +126,13 @@ export default function App() {
     }
 
     engine.start()
+    isRunningRef.current = true
     setIsRunning(true)
   }
 
   function handlePause() {
     engineRef.current?.pause()
+    isRunningRef.current = false
     setIsRunning(false)
   }
 
@@ -126,8 +150,8 @@ export default function App() {
     // 1. Show player bubble immediately — don't wait for LLM
     const msg: ChatMessage = {
       id: `player_${Date.now()}`,
-      senderId: "player",
-      senderName: "אתה",
+      senderId: SENDER_ID.PLAYER,
+      senderName: PLAYER_DISPLAY_NAME,
       content: text,
       tick: buildingState.tick,
       type: "player",
@@ -137,16 +161,17 @@ export default function App() {
 
     // 2. Analyze the player's message and apply game effects
     const stateSnapshot = afterPlayer
-    const residentsSnapshot = buildingState  // used for resident list below
-
     analyzeMessage({
       callType: "analyze",
       playerMessage: text,
       activeIssues: stateSnapshot.activeIssues.filter((i) => !i.isResolved).map((i) => i.type),
       chaosLevel: stateSnapshot.chaosLevel,
       residents: residents.map((r) => ({ id: r.id, name: r.name, sentiment: r.currentSentiment })),
-      recentMessages: stateSnapshot.chatMessages.slice(-5).map((m) => `${m.senderName}: ${m.content}`),
+      recentMessages: stateSnapshot.chatMessages.slice(-5).map((m) => `${m.senderId === SENDER_ID.PLAYER ? PLAYER_LLM_NAME : m.senderName}: ${m.content}`),
     }).then((result) => {
+      // null = circuit opened during this call
+      if (result === null) { checkLlmFatal(); return }
+
       trace.traceLLM({
         callType: "analyze",
         prompt: text,
@@ -162,6 +187,7 @@ export default function App() {
 
       // 3. Generate reactions from residents affected by the player's action
       generateResidentMessages([], residents, stateSnapshot).then((reactions) => {
+        if (isLlmCircuitOpen()) { checkLlmFatal(); return }
         if (!reactions.length) return
         const newState = engine.injectChatMessages(reactions)
         setBuildingState(newState)
@@ -215,7 +241,7 @@ export default function App() {
           <ChatWindow
             messages={buildingState.chatMessages}
             onSendMessage={handleSendMessage}
-            disabled={isGameOver}
+            disabled={isGameOver || llmFatal}
           />
         )}
 
@@ -250,6 +276,20 @@ export default function App() {
             >
               השהה
             </Button>
+          </div>
+        )}
+
+        {/* LLM fatal error overlay — shown when the circuit breaker opens */}
+        {llmFatal && (
+          <div className="wa-gameover">
+            <div className="wa-gameover-card">
+              <div className="text-5xl mb-4">⚠️</div>
+              <div className="wa-gameover-title">המשחק אינו זמין</div>
+              <div className="wa-gameover-reason">שגיאת תקשורת קריטית עם שרת הבינה המלאכותית</div>
+              <Button onClick={() => window.location.reload()} className="wa-start-btn">
+                נסה שוב
+              </Button>
+            </div>
           </div>
         )}
 
