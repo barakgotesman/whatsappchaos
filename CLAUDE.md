@@ -21,6 +21,21 @@ Write meaningful comments throughout — not what the code does, but why and wha
 - **Variables**: comment any variable whose name alone doesn't fully explain its role or constraints
 - **Complex logic**: comment the intent behind threshold checks, probability calculations, and state mutations
 
+### shadcn/ui
+Use shadcn components whenever a native HTML element would need non-trivial interactive behavior or consistent design system styling. Don't wrap plain layout divs in shadcn for no reason.
+
+**Use shadcn when:**
+- A scrollable region needs a custom scrollbar → `ScrollArea`
+- A clickable control needs variants, states, or keyboard handling → `Button`
+- A semantic divider is needed → `Separator`
+- A dialog, popover, dropdown, or overlay is needed → `Dialog`, `DropdownMenu`, etc.
+
+**Don't use shadcn when:**
+- A plain `<div>`, `<span>`, `<header>`, or `<aside>` is semantically correct and needs no interactive behavior
+- A CSS class from `index.css` already handles the styling cleanly
+
+All design tokens (colors, spacing) live in `index.css` as CSS custom properties. Components use Tailwind classes or `.wa-*` semantic class names — never raw inline `style={{}}`.
+
 ### Git
 - **Never commit or push without explicit user instruction** — always wait to be told
 - **Never sign commits** with Claude's name or any co-author tag
@@ -83,15 +98,17 @@ whatsappchaos/
 │   ├── components/
 │   │   ├── ChatWindow.tsx          # WhatsApp-style scrollable chat
 │   │   ├── ResidentPanel.tsx       # Sidebar: resident moods + trust bars
-│   │   └── StatusBar.tsx           # Top bar: chaos level, timer, phase
-│   ├── dev/                           # Only active when ?dev=1 in URL
-│   │   ├── traceStore.ts              # Singleton — no-op in prod, collects all trace data
-│   │   ├── DevPanel.tsx               # Right-side drawer: Event Log / Residents / LLM / Diffs
-│   │   └── DevBadge.tsx               # Floating [DEV] toggle button
+│   │   ├── StatusBar.tsx           # Top bar: chaos level, timer, phase
+│   │   └── dev/                   # Dev-only components (rendered only when ?dev=1)
+│   │       ├── DevBadge.tsx        # Floating ⚙ DEV toggle button
+│   │       ├── DevPanel.tsx        # Right-side drawer: Event Log / Residents / LLM / Diffs
+│   │       └── DevInjectButton.tsx # +msg button to inject fake messages
+│   ├── dev/                       # Dev-only logic (no React, no UI)
+│   │   ├── traceStore.ts          # Singleton — no-op in prod, collects all trace data
+│   │   └── devSeeds.ts            # Fake seed messages for dev testing
 │   ├── lib/
 │   │   └── utils.ts               # shadcn cn() utility
-│   └── styles/
-│       └── globals.css
+│   └── index.css                  # All design tokens + .wa-* + .dev-* class definitions
 ├── api/
 │   └── groq.ts                    # Vercel serverless function — Groq proxy
 ├── public/
@@ -167,11 +184,17 @@ See `docs/models/resident.md` for full schema. Each has a `personaDescription` f
 - [x] `src/constants.ts` — all union-type string literals centralized (EVENT_TYPE, ALLIANCE, SENTIMENT, PHASE, ARCHETYPE, REL_EVENT_TYPE)
 - [x] `reactionMultiplier` moved onto each resident definition (no archetype switch in logic)
 
-### M3 — UI Shell
-- [ ] WhatsApp-style `ChatWindow` (shadcn ScrollArea)
-- [ ] `ResidentPanel` sidebar with resident names only (no stats — chat tells the story)
-- [ ] Timer display
-- [ ] Wire simulation tick to React state
+### M3 — UI Shell ✅
+- [x] WhatsApp-style `ChatWindow` (shadcn ScrollArea)
+- [x] `ResidentPanel` group info screen with resident names only (no stats — chat tells the story)
+- [x] Wire simulation tick to React state
+- [x] RTL bubble alignment fixed — player right, residents left
+- [x] Player messages and dev-injected messages persist across ticks (engine `injectChatMessages` pattern — single source of truth, no race condition duplication)
+- [x] Textarea auto-resizes up to 6 rows; Shift+Enter inserts newlines; `white-space: pre-wrap` in bubbles
+- [x] Dev tooling built: `DevBadge` + `DevPanel` (4 tabs: Events / Residents / LLM / Diffs)
+- [x] Dev file structure split: logic in `src/dev/`, components in `src/components/dev/`
+- [x] Win/lose condition checks on each tick (`engine.checkEndConditions`)
+- [x] Game over / victory screens in `App.tsx`
 
 ### M4 — LLM Integration
 - [ ] `src/llm/groqClient.ts` typed browser-side wrapper (calls `/api/groq`)
@@ -181,9 +204,7 @@ See `docs/models/resident.md` for full schema. Each has a `personaDescription` f
 - [ ] Vercel project linked + `GROQ_API_KEY` set in Vercel env
 
 ### M5 — Game Loop
-- [ ] Win/lose condition checks on each tick
 - [ ] Endgame pressure system (vote sentiment — internal only, not shown to player)
-- [ ] Game over / victory screens
 - [ ] Difficulty tuning and balance pass
 
 ---
@@ -205,7 +226,9 @@ Append `?dev=1` to any URL to activate the dev panel. Zero impact in production 
 | LLM Log | Every Groq call: prompt, raw response, parsed result, latency, fallback flag |
 | State Diffs | Per-tick before/after snapshot — only changed fields shown |
 
-**Architecture:** `src/dev/traceStore.ts` is a singleton. Simulation, residentAI, and groqClient call `trace.traceX()` without knowing about dev mode. The store decides whether to record or discard.
+**Architecture:** `src/dev/traceStore.ts` is a singleton. Simulation, residentAI, and groqClient call `trace.traceX()` without knowing about dev mode. The store decides whether to record or discard. `src/components/dev/DevPanel.tsx` subscribes via `trace.subscribe()` and re-renders on every new entry — engine and panel are fully decoupled.
+
+**File split:** logic (no React) lives in `src/dev/`; components live in `src/components/dev/`.
 
 ---
 

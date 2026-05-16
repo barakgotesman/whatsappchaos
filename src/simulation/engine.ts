@@ -90,6 +90,18 @@ export class SimulationEngine {
   }
 
   /**
+   * Appends messages into the engine's authoritative state and returns an
+   * immutable snapshot of the full updated state for immediate React render.
+   * This avoids a race condition where a tick fires between the engine write
+   * and a React functional-update, which would duplicate the messages.
+   * @param messages - ChatMessage[] to append
+   */
+  injectChatMessages(messages: import("@/types").ChatMessage[]): BuildingState {
+    this.state.chatMessages = [...this.state.chatMessages, ...messages]
+    return structuredClone(this.state)
+  }
+
+  /**
    * Applies a PlayerAction to the game state immediately (outside the tick loop).
    * Called when the player sends a message and the LLM has classified it.
    *

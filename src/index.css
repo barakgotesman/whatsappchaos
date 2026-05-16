@@ -1,66 +1,600 @@
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;700;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* shadcn/ui CSS variables — dark theme matches WhatsApp's dark UI */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
-  }
+    --background:             11 21% 7%;
+    --foreground:             20 5% 90%;
+    --card:                   0 0% 16%;
+    --card-foreground:        20 5% 90%;
+    --popover:                0 0% 16%;
+    --popover-foreground:     20 5% 90%;
+    --primary:                145 69% 49%;
+    --primary-foreground:     145 100% 7%;
+    --secondary:              30 100% 50%;
+    --secondary-foreground:   20 5% 90%;
+    --muted:                  0 0% 16%;
+    --muted-foreground:       100 8% 57%;
+    --accent:                 0 0% 21%;
+    --accent-foreground:      20 5% 90%;
+    --destructive:            0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border:                 120 10% 26%;
+    --input:                  0 0% 17%;
+    --ring:                   145 69% 49%;
+    --radius:                 0.25rem;
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    /* Stitch "Urban Discordance" palette */
+    --c-bg:                #0e0e0e;
+    --c-surface:           #131313;
+    --c-surface-low:       #1c1b1b;
+    --c-surface-mid:       #201f1f;
+    --c-surface-high:      #2a2a2a;
+    --c-bubble-in:         #202c33;
+    --c-bubble-out:        #005c4b;
+    --c-input-field:       #2a2f32;
+    --c-border:            #3c4a3d;
+    --c-phone-ring:        #1f1f1f;
+    --c-phone-border:      #333333;
+    --c-primary:           #4ff07f;
+    --c-primary-container: #25d366;
+    --c-error-container:   #93000a;
+    --c-error:             #ffb4ab;
+    --c-text:              #e5e2e1;
+    --c-text-variant:      #bbcbb9;
+    --c-subtext:           #8696a0;
+    --c-blue:              #53bdeb;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  * { @apply border-border; }
+  html, body { font-family: 'Rubik', sans-serif; margin: 0; height: 100%; }
+  body { background: var(--c-bg); color: var(--c-text); overflow: hidden; }
+  #root { width: 100%; height: 100vh; display: flex; }
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+@layer components {
+
+  /* ── Page ───────────────────────────────────────────────── */
+  .wa-page {
+    @apply relative flex items-center justify-center w-full h-screen overflow-hidden;
+    background: var(--c-bg);
   }
-  body {
-    @apply bg-background text-foreground;
-    margin: 0;
+
+  .wa-bloom {
+    @apply absolute rounded-full blur-3xl pointer-events-none;
+    background: radial-gradient(circle, rgba(79,240,127,0.12) 0%, transparent 70%);
   }
-  #root {
-    width: 100%;
-    height: 100vh;
-    display: flex;
+
+  /* ── iPhone frame ─────────────────────────────────────────
+     Height drives the scaling — width is derived from aspect ratio.
+     Use a conservative max-height so input is never cut off.   */
+  .wa-phone {
+    @apply relative flex flex-col overflow-hidden;
+    /* Limit by both viewport height and a sensible max */
+    height: min(780px, 88vh);
+    /* Width = height × phone aspect ratio 9:19.5 */
+    width: calc(min(780px, 88vh) * 9 / 19.5);
+    /* Border radius scales with phone height */
+    border-radius: calc(min(780px, 88vh) * 0.055);
+    border: 4px solid var(--c-phone-border);
+    background: var(--c-surface);
+    box-shadow:
+      0 0 0 10px var(--c-phone-ring),
+      0 0 0 11px #2b2b2b,
+      0 24px 64px rgba(0,0,0,0.85);
+  }
+
+  /* Dynamic island */
+  .wa-notch {
+    @apply absolute left-1/2 -translate-x-1/2 z-50 shrink-0;
+    top: 0;
+    width: 100px;
+    height: 24px;
+    background: var(--c-phone-ring);
+    border-radius: 0 0 18px 18px;
+  }
+
+  /* Home bar — absolute, purely decorative */
+  .wa-home-bar {
+    @apply absolute left-1/2 -translate-x-1/2 rounded-full pointer-events-none;
+    bottom: 6px;
+    width: 100px;
+    height: 4px;
+    background: rgba(187,203,185,0.3);
+    z-index: 10;
+  }
+
+  /* ── Header ───────────────────────────────────────────────
+     LTR flex: [back] [avatar+name] [spacer] [menu]
+     Text inside uses direction:rtl so Hebrew renders correctly. */
+  .wa-header {
+    @apply flex items-center gap-1 px-2 shrink-0 z-10;
+    padding-top: 28px;  /* clear the notch */
+    height: 68px;
+    background: var(--c-surface-low);
+    border-bottom: 1px solid var(--c-border);
+    direction: ltr;     /* flex stays LTR — icons and group on correct sides */
+  }
+
+  .wa-header-back {
+    @apply flex items-center justify-center w-9 h-9 rounded-full shrink-0 transition-colors;
+    color: var(--c-primary);
+  }
+  .wa-header-back:hover { background: rgba(255,255,255,0.07); }
+
+  /* Tappable group area: avatar + name stack */
+  .wa-header-group {
+    @apply flex items-center gap-2 flex-1 min-w-0 py-1 px-1 rounded-lg transition-colors text-left;
+  }
+  .wa-header-group:hover { background: rgba(255,255,255,0.05); }
+
+  .wa-header-avatar {
+    @apply flex items-center justify-center w-9 h-9 rounded-full shrink-0 text-lg;
+    background: var(--c-surface-high);
+  }
+
+  .wa-header-text { @apply flex flex-col min-w-0; direction: rtl; }
+
+  .wa-header-title {
+    @apply text-[14px] font-semibold leading-tight truncate;
+    color: var(--c-text);
+  }
+
+  .wa-header-subtitle {
+    @apply text-[11px] leading-tight truncate;
+    color: var(--c-subtext);
+  }
+
+  .wa-header-icon {
+    @apply flex items-center justify-center w-9 h-9 rounded-full shrink-0 transition-colors;
+    color: var(--c-text-variant);
+  }
+  .wa-header-icon:hover { background: rgba(255,255,255,0.07); }
+
+  /* ── Chat area ─────────────────────────────────────────── */
+  .wa-chat {
+    @apply flex-1 min-h-0;
+    background: #0b0e11;
+    direction: rtl;
+  }
+
+  .wa-messages-inner {
+    @apply flex flex-col gap-3 px-3 py-4;
+    min-height: 100%;
+  }
+
+  .wa-empty-state {
+    @apply flex items-center justify-center py-16 text-sm;
+    color: var(--c-subtext);
+  }
+
+  /* ── Bubbles ───────────────────────────────────────────── */
+  .wa-bubble-row {
+    @apply flex flex-col;
+    max-width: 85%;
+  }
+  /* RTL context: flex "start" = visual right, "end" = visual left.
+     --in (residents) sit on the visual left; --out (player) on the visual right. */
+  .wa-bubble-row--in  { @apply self-end items-end; }
+  .wa-bubble-row--out { @apply self-start items-start; }
+
+  .wa-bubble-sender-row {
+    @apply flex items-center gap-2 mb-1;
+  }
+  .wa-bubble-row--out .wa-bubble-sender-row { @apply flex-row-reverse; }
+
+  .wa-bubble-avatar {
+    @apply flex items-center justify-center w-8 h-8 rounded-full shrink-0 text-xs font-bold border-2;
+    color: #111;
+  }
+
+  .wa-bubble-sender-name {
+    @apply text-[11px] font-bold uppercase tracking-tight;
+  }
+
+  .wa-bubble {
+    @apply px-3 py-2 text-[14px] leading-5 shadow-sm;
+    color: var(--c-text);
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+
+  .wa-bubble--in  { background: var(--c-bubble-in);  border-radius: 0 12px 12px 12px; }
+  .wa-bubble--out { background: var(--c-bubble-out); border-radius: 12px 0 12px 12px; }
+
+  .wa-bubble-time {
+    @apply flex items-center gap-1 mt-1;
+    font-size: 10px;
+    color: var(--c-subtext);
+  }
+  .wa-bubble-row--out .wa-bubble-time { @apply justify-start; }
+  .wa-read-ticks { color: var(--c-primary); }
+
+  .wa-system-row { @apply flex justify-center; }
+  .wa-system-badge {
+    @apply text-[11px] px-4 py-1 rounded-lg;
+    background: rgba(53,53,52,0.5);
+    color: var(--c-text-variant);
+  }
+
+  /* ── Input bar ─────────────────────────────────────────── */
+  .wa-input-bar {
+    @apply flex items-center gap-2 px-3 py-3 shrink-0;
+    background: var(--c-surface-low);
+    /* padding-bottom slightly larger to not sit on top of home bar */
+    padding-bottom: 20px;
+    direction: ltr;
+  }
+
+  .wa-input-icon {
+    @apply flex items-center justify-center w-8 h-8 shrink-0 transition-colors;
+    color: var(--c-text-variant);
+  }
+  .wa-input-icon:hover { color: var(--c-primary); }
+
+  .wa-input-field {
+    @apply flex-1 flex items-center gap-2 px-3 py-2 rounded-2xl;
+    background: var(--c-input-field);
+    min-width: 0; /* allow flex child to shrink */
+  }
+
+  .wa-textarea {
+    @apply flex-1 bg-transparent border-none outline-none text-sm resize-none;
+    color: var(--c-text);
+    /* ltr keeps the scrollbar on the right side; plaintext lets the bidi
+       algorithm detect Hebrew and render it RTL as expected */
+    direction: ltr;
+    unicode-bidi: plaintext;
+    text-align: right;
+    font-family: 'Rubik', sans-serif;
+    line-height: 1.4;
+    min-width: 0;
+    overflow-y: auto;
+  }
+  .wa-textarea::placeholder { color: var(--c-subtext); }
+  .wa-textarea::-webkit-scrollbar { width: 4px; }
+  .wa-textarea::-webkit-scrollbar-track { background: transparent; }
+  .wa-textarea::-webkit-scrollbar-thumb { background: var(--c-subtext); border-radius: 2px; }
+  .wa-textarea::-webkit-scrollbar-thumb:hover { background: var(--c-text); }
+
+  .wa-send-btn {
+    @apply flex items-center justify-center w-10 h-10 rounded-full shrink-0
+           transition-all active:scale-90 disabled:opacity-40;
+    background: var(--c-primary-container);
+    color: #003915;
+  }
+
+  /* ── Overlays ──────────────────────────────────────────── */
+  .wa-start-overlay {
+    @apply absolute inset-0 flex items-center justify-center z-20;
+    background: rgba(11,14,17,0.78);
+    backdrop-filter: blur(4px);
+  }
+
+  .wa-start-btn {
+    @apply px-8 py-3 rounded-full text-base font-bold transition-all active:scale-95 border-0;
+    background: var(--c-primary-container);
+    color: #003915;
+    box-shadow: 0 0 20px rgba(37,211,102,0.35);
+  }
+  .wa-start-btn:hover { box-shadow: 0 0 30px rgba(37,211,102,0.55); }
+
+  .wa-pause-btn {
+    @apply rounded-full px-4 py-1 text-xs font-medium border-0
+           opacity-60 hover:opacity-100 transition-opacity;
+    background: rgba(42,47,50,0.9);
+    color: var(--c-text-variant);
+    outline: 1px solid var(--c-border);
+  }
+
+  /* ── Dev inject button — floats outside the phone frame ── */
+  .wa-dev-inject-btn {
+    position: fixed;
+    bottom: 80px;
+    right: 16px;
+    z-index: 9999;
+    background: rgba(37,211,102,0.15);
+    border: 1px solid rgba(37,211,102,0.4);
+    color: #25d366;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: background 0.15s;
+  }
+  .wa-dev-inject-btn:hover {
+    background: rgba(37,211,102,0.28);
+  }
+
+  /* ── Group info screen ─────────────────────────────────── */
+  .wa-group-info {
+    @apply absolute inset-0 flex flex-col z-30;
+    background: var(--c-surface);
+    direction: rtl;
+  }
+
+  .wa-group-info-header {
+    @apply flex items-center gap-2 px-2 shrink-0;
+    padding-top: 28px;
+    height: 68px;
+    background: var(--c-surface-low);
+    border-bottom: 1px solid var(--c-border);
+    direction: ltr; /* same LTR rule as main header */
+  }
+
+  .wa-group-info-title {
+    @apply text-[15px] font-semibold flex-1;
+    color: var(--c-text);
+    direction: rtl;
+    text-align: right;
+  }
+
+  .wa-group-info-hero {
+    @apply flex flex-col items-center py-5 gap-2 shrink-0;
+    background: var(--c-surface-mid);
+    border-bottom: 1px solid var(--c-border);
+  }
+
+  .wa-group-info-avatar {
+    @apply flex items-center justify-center w-16 h-16 rounded-full text-4xl;
+    background: var(--c-surface-high);
+  }
+
+  .wa-group-info-name {
+    @apply text-[15px] font-semibold text-center px-4 leading-tight;
+    color: var(--c-text);
+  }
+
+  .wa-group-info-meta {
+    @apply text-[12px];
+    color: var(--c-subtext);
+  }
+
+  .wa-group-info-section-label {
+    @apply px-4 pt-3 pb-1 text-[11px] font-bold uppercase tracking-wider;
+    color: var(--c-primary);
+  }
+
+  .wa-group-info-row {
+    @apply flex items-center gap-3 px-4 py-3;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    direction: rtl;
+  }
+  .wa-group-info-row:last-child { border-bottom: none; }
+
+  /* ── Shared resident atoms ─────────────────────────────── */
+  .wa-resident-avatar {
+    @apply flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold shrink-0 border-2;
+    color: #111;
+  }
+
+  .wa-resident-name {
+    @apply text-[13px] font-medium truncate;
+    color: var(--c-text);
+  }
+  .wa-resident-name--inactive { color: var(--c-subtext); }
+
+  .wa-resident-apt {
+    @apply text-[11px];
+    color: var(--c-subtext);
+  }
+
+  .wa-dot { @apply w-2 h-2 rounded-full shrink-0; }
+  .wa-dot--supportive { background: var(--c-primary-container); }
+  .wa-dot--neutral    { background: var(--c-subtext); }
+  .wa-dot--skeptical  { background: #f59e0b; }
+  .wa-dot--hostile    { background: #ef4444; }
+
+  /* ── Game over ─────────────────────────────────────────── */
+  .wa-gameover {
+    @apply absolute inset-0 flex items-center justify-center z-40;
+    background: rgba(11,14,17,0.93);
+    backdrop-filter: blur(6px);
+  }
+
+  .wa-gameover-card {
+    @apply text-center p-8 rounded-2xl mx-4;
+    width: 280px;
+    background: var(--c-surface-high);
+    border: 1px solid var(--c-border);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+  }
+
+  .wa-gameover-title { @apply text-xl font-bold mb-2; color: var(--c-text); }
+  .wa-gameover-reason { @apply text-sm leading-relaxed mb-6; color: var(--c-subtext); direction: rtl; }
+
+  /* ── Dev panel ─────────────────────────────────────────── */
+
+  .dev-badge {
+    @apply fixed bottom-4 right-4 z-50 px-3 py-1.5 rounded-full text-xs font-mono font-bold;
+    background: #7c3aed;
+    color: #fff;
+    border: 1px solid #a78bfa;
+    box-shadow: 0 2px 12px rgba(124,58,237,0.5);
+    cursor: pointer;
+  }
+  .dev-badge:hover { background: #6d28d9; }
+
+  .dev-panel {
+    @apply fixed top-0 right-0 bottom-0 z-40 flex flex-col;
+    width: 360px;
+    background: #0d1117;
+    border-left: 1px solid #21262d;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 11px;
+  }
+
+  .dev-panel-header {
+    @apply px-4 py-3 text-xs font-bold tracking-widest shrink-0;
+    color: #7c3aed;
+    border-bottom: 1px solid #21262d;
+    background: #0d1117;
+  }
+
+  .dev-tabs {
+    @apply flex shrink-0;
+    border-bottom: 1px solid #21262d;
+  }
+
+  .dev-tab-btn {
+    @apply flex-1 py-2 px-1 text-[10px] font-semibold tracking-wide transition-colors;
+    color: #8b949e;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .dev-tab-btn:hover { color: #c9d1d9; }
+  .dev-tab-btn--active {
+    color: #a78bfa;
+    border-bottom-color: #7c3aed;
+  }
+
+  .dev-panel-body {
+    @apply flex-1 min-h-0;
+  }
+
+  .dev-list {
+    @apply flex flex-col gap-px py-1;
+  }
+
+  /* A single row in Event Log / State Diffs */
+  .dev-row {
+    @apply flex items-center gap-2 px-3 py-1.5;
+    color: #c9d1d9;
+    border-bottom: 1px solid #161b22;
+  }
+  .dev-row:hover { background: #161b22; }
+
+  .dev-tick {
+    @apply text-[10px] shrink-0;
+    color: #484f58;
+    min-width: 28px;
+  }
+
+  .dev-tag {
+    @apply text-[10px] px-1.5 py-0.5 rounded shrink-0;
+    background: #21262d;
+    color: #79c0ff;
+  }
+
+  .dev-dim { color: #484f58; }
+
+  .dev-severity {
+    @apply ml-auto font-bold text-[10px];
+  }
+
+  /* Resident cards */
+  .dev-resident-card {
+    @apply flex flex-col gap-1 px-3 py-2;
+    border-bottom: 1px solid #161b22;
+  }
+
+  .dev-resident-header {
+    @apply flex items-center gap-2 mb-1;
+  }
+
+  .dev-resident-name {
+    @apply font-semibold text-[11px];
+    color: #c9d1d9;
+  }
+
+  .dev-sentiment {
+    @apply text-[9px] px-1.5 py-0.5 rounded-full font-bold ml-auto;
+  }
+  .dev-sentiment--supportive { background: #1a4731; color: #3fb950; }
+  .dev-sentiment--neutral    { background: #21262d; color: #8b949e; }
+  .dev-sentiment--skeptical  { background: #2d2208; color: #d29922; }
+  .dev-sentiment--hostile    { background: #3d1c1c; color: #f85149; }
+
+  .dev-trust-row {
+    @apply flex items-center gap-2;
+    color: #484f58;
+  }
+
+  .dev-bar-track {
+    @apply flex-1 rounded-full overflow-hidden;
+    height: 4px;
+    background: #21262d;
+  }
+
+  .dev-bar-fill {
+    height: 4px;
+    border-radius: 9999px;
+    transition: width 0.3s;
+  }
+  .dev-bar-fill--trust { background: #388bfd; }
+
+  .dev-bar-value {
+    @apply text-[10px] shrink-0;
+    color: #8b949e;
+    min-width: 24px;
+    text-align: right;
+  }
+
+  /* LLM log */
+  .dev-llm-entry {
+    border-bottom: 1px solid #161b22;
+  }
+
+  .dev-expand-icon {
+    @apply ml-auto text-[9px];
+    color: #484f58;
+  }
+
+  .dev-badge-error {
+    @apply text-[9px] px-1 py-0.5 rounded font-bold;
+    background: #3d1c1c;
+    color: #f85149;
+  }
+
+  .dev-badge-warn {
+    @apply text-[9px] px-1 py-0.5 rounded font-bold;
+    background: #2d2208;
+    color: #d29922;
+  }
+
+  .dev-llm-detail {
+    @apply px-3 pb-2;
+    background: #0d1117;
+  }
+
+  .dev-llm-section {
+    @apply text-[9px] font-bold tracking-widest mt-2 mb-1;
+    color: #484f58;
+  }
+
+  .dev-pre {
+    @apply text-[10px] leading-relaxed whitespace-pre-wrap break-all;
+    color: #8b949e;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+
+  /* State diffs */
+  .dev-diff-entry {
+    @apply flex flex-col gap-0.5 px-3 py-1.5;
+    border-bottom: 1px solid #161b22;
+  }
+
+  .dev-diff-row {
+    @apply flex items-center gap-2;
+  }
+
+  .dev-diff-key   { color: #79c0ff; min-width: 100px; }
+  .dev-diff-before { color: #f85149; }
+  .dev-diff-after  { color: #3fb950; }
+
+  .dev-empty {
+    @apply px-4 py-8 text-center text-[11px];
+    color: #484f58;
   }
 }

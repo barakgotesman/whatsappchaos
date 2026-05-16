@@ -1,122 +1,199 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useRef, useState, useCallback } from "react"
+import type { BuildingState, Resident, ChatMessage } from "@/types"
+import { SimulationEngine } from "@/simulation/engine"
+import { Button } from "@/components/ui/button"
+import { StatusBar } from "@/components/StatusBar"
+import { ChatWindow } from "@/components/ChatWindow"
+import { ResidentPanel } from "@/components/ResidentPanel"
+import { trace } from "@/dev/traceStore"
+import { DEV_SEED_MESSAGES } from "@/dev/devSeeds"
+import { DevInjectButton } from "@/components/dev/DevInjectButton"
+import { DevBadge } from "@/components/dev/DevBadge"
+import { DevPanel } from "@/components/dev/DevPanel"
 
-function App() {
-  const [count, setCount] = useState(0)
+/**
+ * Root component — owns the engine singleton and snapshot state.
+ * Desktop layout: dark ambient page + centered iPhone frame.
+ * Group info screen slides in over the chat when user taps the group name.
+ */
+export default function App() {
+  const [buildingState, setBuildingState]     = useState<BuildingState | null>(null)
+  const [residents, setResidents]             = useState<Resident[]>([])
+  const [isRunning, setIsRunning]             = useState(false)
+  const [showGroupInfo, setShowGroupInfo]     = useState(false)
+  const [devPanelOpen, setDevPanelOpen]       = useState(false)
+
+  const engineRef = useRef<SimulationEngine | null>(null)
+
+  useEffect(() => {
+    const engine = new SimulationEngine(3000)
+
+    engine.onTick = (state, res) => {
+      setBuildingState(structuredClone(state))
+      setResidents(structuredClone(res))
+    }
+
+    engine.onGameOver = (result, reason) => {
+      setBuildingState((prev) =>
+        prev ? { ...prev, isGameOver: true, gameResult: result, gameOverReason: reason } : prev
+      )
+    }
+
+    engineRef.current = engine
+
+    // Push initial snapshot before first tick so UI renders immediately.
+    // Private field access via cast — isolated to this one-time init.
+    const eng = engine as unknown as { state: BuildingState; residents: Resident[] }
+
+    // In dev mode, seed the chat with fake messages so the UI is immediately testable.
+    if (trace.isDevMode()) {
+      eng.state.chatMessages = [...DEV_SEED_MESSAGES]
+    }
+
+    engine.onTick!(structuredClone(eng.state), structuredClone(eng.residents), [])
+  }, [])
+
+  function handleStart() {
+    engineRef.current?.start()
+    setIsRunning(true)
+  }
+
+  function handlePause() {
+    engineRef.current?.pause()
+    setIsRunning(false)
+  }
+
+  /**
+   * Player sends a message.
+   * M4 will route this through LLM analyze → PlayerAction.
+   * For now inserts a player bubble directly so the UI is testable.
+   */
+  const handleSendMessage = useCallback((text: string) => {
+    if (!buildingState || buildingState.isGameOver) return
+
+    const msg: ChatMessage = {
+      id: `player_${Date.now()}`,
+      senderId: "player",
+      senderName: "אתה",
+      content: text,
+      tick: buildingState.tick,
+      type: "player",
+    }
+
+    // Inject into engine and get back the canonical snapshot — avoids a race
+    // where a tick fires between the engine write and a separate functional setState,
+    // which would cause the message to appear twice.
+    const snapshot = engineRef.current?.injectChatMessages([msg])
+    if (snapshot) setBuildingState(snapshot)
+  }, [buildingState])
+
+  /**
+   * Dev-only: appends a batch of fake messages directly into state.
+   * Bypasses the engine so it works whether the simulation is running or paused.
+   */
+  const handleDevInject = useCallback((messages: ChatMessage[]) => {
+    const snapshot = engineRef.current?.injectChatMessages(messages)
+    if (snapshot) setBuildingState(snapshot)
+  }, [])
+
+  const isGameOver = buildingState?.isGameOver ?? false
+  const gameResult = buildingState?.gameResult
+  const hasStarted = (buildingState?.tick ?? 0) > 0 || isRunning
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="wa-page">
+      {/* Dev inject button — only rendered when ?dev=1 */}
+      {trace.isDevMode() && buildingState && (
+        <DevInjectButton
+          currentTick={buildingState.tick}
+          onInject={handleDevInject}
+        />
+      )}
 
-      <div className="ticks"></div>
+      {/* Ambient background blooms */}
+      <div className="wa-bloom w-64 h-64 top-20 left-20 opacity-30" />
+      <div className="wa-bloom w-96 h-96 bottom-20 right-20 opacity-20" />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* ── iPhone frame ── */}
+      <div className="wa-phone">
+        {/* Dynamic Island */}
+        <div className="wa-notch" />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+        {/* Chat header — tapping group name opens group info */}
+        {buildingState && (
+          <StatusBar
+            state={buildingState}
+            onGroupNameClick={() => setShowGroupInfo(true)}
+          />
+        )}
+
+        {/* Chat + input */}
+        {buildingState && (
+          <ChatWindow
+            messages={buildingState.chatMessages}
+            onSendMessage={handleSendMessage}
+            disabled={isGameOver}
+          />
+        )}
+
+        {/* Home bar */}
+        <div className="wa-home-bar" />
+
+        {/* Group info screen — slides over chat when group name tapped */}
+        {showGroupInfo && (
+          <ResidentPanel
+            residents={residents}
+            onClose={() => setShowGroupInfo(false)}
+          />
+        )}
+
+        {/* Start overlay */}
+        {!isRunning && !isGameOver && !showGroupInfo && (
+          <div className="wa-start-overlay">
+            <Button onClick={handleStart} variant="ghost" className="wa-start-btn">
+              {hasStarted ? "המשך" : "התחל משחק"}
+            </Button>
+          </div>
+        )}
+
+        {/* Pause pill */}
+        {isRunning && !isGameOver && !showGroupInfo && (
+          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-30">
+            <Button
+              onClick={handlePause}
+              variant="ghost"
+              size="sm"
+              className="wa-pause-btn"
+            >
+              השהה
+            </Button>
+          </div>
+        )}
+
+        {/* Game over overlay */}
+        {isGameOver && (
+          <div className="wa-gameover">
+            <div className="wa-gameover-card">
+              <div className="text-5xl mb-4">{gameResult === "win" ? "🏆" : "🗳️"}</div>
+              <div className="wa-gameover-title">
+                {gameResult === "win" ? "ניצחת!" : "הפסדת"}
+              </div>
+              <div className="wa-gameover-reason">{buildingState?.gameOverReason}</div>
+              <Button onClick={() => window.location.reload()} className="wa-start-btn">
+                משחק חדש
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Dev panel + badge — only when ?dev=1 */}
+      {trace.isDevMode() && (
+        <>
+          {devPanelOpen && <DevPanel />}
+          <DevBadge open={devPanelOpen} onToggle={() => setDevPanelOpen((o) => !o)} />
+        </>
+      )}
+    </div>
   )
 }
-
-export default App
