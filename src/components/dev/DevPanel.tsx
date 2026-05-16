@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { trace } from "@/dev/traceStore"
 import type {
   EventTraceEntry,
@@ -9,6 +10,18 @@ import type {
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 type Tab = "events" | "residents" | "llm" | "diffs"
+
+// ─── Tooltip helper ───────────────────────────────────────────
+
+/** Wraps any inline element and shows a shadcn tooltip on hover */
+function Tip({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="top"><p>{label}</p></TooltipContent>
+    </Tooltip>
+  )
+}
 
 // ─── Tab button ───────────────────────────────────────────────
 
@@ -38,9 +51,11 @@ function EventLog({ entries }: { entries: EventTraceEntry[] }) {
             {e.event.sourceId}
             {e.event.targetId ? ` → ${e.event.targetId}` : ""}
           </span>
-          <span className="dev-severity" style={{ color: severityColor(e.event.severity) }}>
-            {e.event.severity}
-          </span>
+          <Tip label={`severity: ${e.event.severity}/100 — ${e.event.severity >= 70 ? "high impact" : e.event.severity >= 40 ? "medium impact" : "low impact"}`}>
+            <span className="dev-severity" style={{ color: severityColor(e.event.severity) }}>
+              {e.event.severity}
+            </span>
+          </Tip>
         </div>
       ))}
     </div>
@@ -79,7 +94,9 @@ function ResidentCards({ entries }: { entries: ResidentTraceEntry[] }) {
               <div className="dev-bar-track">
                 <div className="dev-bar-fill dev-bar-fill--trust" style={{ width: `${trustInPlayer}%` }} />
               </div>
-              <span className="dev-bar-value">{Math.round(trustInPlayer)}</span>
+              <Tip label={`trust in player: ${Math.round(trustInPlayer)}/100 — ${trustInPlayer >= 70 ? "supportive" : trustInPlayer >= 40 ? "neutral" : "hostile"}`}>
+                <span className="dev-bar-value">{Math.round(trustInPlayer)}</span>
+              </Tip>
             </div>
           </div>
         )
@@ -95,7 +112,9 @@ function MoodBar({ label, value }: { label: string; value: number }) {
       <div className="dev-bar-track">
         <div className="dev-bar-fill" style={{ width: `${value}%`, background: moodColor(value) }} />
       </div>
-      <span className="dev-bar-value">{Math.round(value)}</span>
+      <Tip label={`${label}: ${Math.round(value)}/100`}>
+        <span className="dev-bar-value">{Math.round(value)}</span>
+      </Tip>
     </div>
   )
 }
@@ -123,7 +142,9 @@ function LLMLog({ entries }: { entries: LLMTraceEntry[] }) {
           <div className="dev-row" onClick={() => toggle(e.id)} style={{ cursor: "pointer" }}>
             <span className="dev-tick">#{e.tick}</span>
             <span className="dev-tag">{e.callType}</span>
-            <span className="dev-dim">{e.latencyMs}ms</span>
+            <Tip label={`LLM round-trip: ${e.latencyMs}ms`}>
+              <span className="dev-dim">{e.latencyMs}ms</span>
+            </Tip>
             {!e.success && <span className="dev-badge-error">ERR</span>}
             {e.fallbackUsed && <span className="dev-badge-warn">FALLBACK</span>}
             <span className="dev-expand-icon">{expanded.has(e.id) ? "▲" : "▼"}</span>
@@ -144,6 +165,21 @@ function LLMLog({ entries }: { entries: LLMTraceEntry[] }) {
 
 // ─── State Diffs tab ──────────────────────────────────────────
 
+/** Human-readable explanation for each BuildingState scalar key */
+const STATE_KEY_DOCS: Record<string, string> = {
+  tick:                    "Simulation step counter — increments every engine tick",
+  gameTimeElapsedSeconds:  "Real seconds elapsed since the game started",
+  gameDurationSeconds:     "Total session length the game was configured for (480–720s)",
+  phase:                   "Current game act: intro → tension → crisis → vote → ended",
+  noiseLevel:              "0–100 — rising noise triggers noise_complaint events above 60",
+  chaosLevel:              "0–100 — primary lose meter; game over if it hits 95",
+  stabilityIndex:          "0–100 — inverse of chaos; decays passively each tick",
+  voteSentiment:           "0–100 — below 25 the residents call a no-confidence vote (lose)",
+  isGameOver:              "True once a win or lose condition has been triggered",
+  gameResult:              "'win' or 'lose' — set when the game ends",
+  gameOverReason:          "Human-readable explanation of why the game ended",
+}
+
 /** Shows per-tick before/after for any BuildingState keys that changed */
 function StateDiffs({ entries }: { entries: StateDiffEntry[] }) {
   if (entries.length === 0) return <DevEmpty>No state changes yet.</DevEmpty>
@@ -154,7 +190,9 @@ function StateDiffs({ entries }: { entries: StateDiffEntry[] }) {
           <span className="dev-tick">#{e.tick}</span>
           {e.changedKeys.map((k) => (
             <div key={k} className="dev-diff-row">
-              <span className="dev-diff-key">{k}</span>
+              <Tip label={STATE_KEY_DOCS[k] ?? k}>
+                <span className="dev-diff-key">{k}</span>
+              </Tip>
               <span className="dev-diff-before">{String((e.before as Record<string, unknown>)[k])}</span>
               <span className="dev-dim">→</span>
               <span className="dev-diff-after">{String((e.after as Record<string, unknown>)[k])}</span>
@@ -205,6 +243,7 @@ export function DevPanel() {
   const diffs     = trace.getDiffs()
 
   return (
+    <TooltipProvider delayDuration={300}>
     <aside className="dev-panel">
       <div className="dev-panel-header">DEV PANEL</div>
 
@@ -222,5 +261,6 @@ export function DevPanel() {
         {tab === "diffs"     && <StateDiffs  entries={diffs} />}
       </ScrollArea>
     </aside>
+    </TooltipProvider>
   )
 }
