@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react"
-import type { BuildingState, Resident, ChatMessage } from "@/types"
+import type { BuildingState, Resident, ChatMessage, SimulationEvent } from "@/types"
 import { SimulationEngine } from "@/simulation/engine"
 import { Button } from "@/components/ui/button"
 import { StatusBar } from "@/components/StatusBar"
@@ -10,6 +10,8 @@ import { DEV_SEED_MESSAGES } from "@/dev/devSeeds"
 import { DevInjectButton } from "@/components/dev/DevInjectButton"
 import { DevBadge } from "@/components/dev/DevBadge"
 import { DevPanel } from "@/components/dev/DevPanel"
+import { generateResidentMessages } from "@/llm/residentSpeaker"
+import { analyzeMessage } from "@/llm/groqClient"
 
 /**
  * Root component — owns the engine singleton and snapshot state.
@@ -28,9 +30,15 @@ export default function App() {
   useEffect(() => {
     const engine = new SimulationEngine(3000)
 
-    engine.onTick = (state, res) => {
+    /**
+     * Called after every engine tick.
+     * Updates React state, then fires LLM calls async so the chat doesn't stall.
+     * LLM messages are injected back into the engine when they resolve.
+     */
+    engine.onTick = (state, res, events) => {
       setBuildingState(structuredClone(state))
       setResidents(structuredClone(res))
+      triggerResidentSpeaking(events, res, state)
     }
 
     engine.onGameOver = (result, reason) => {
@@ -53,8 +61,49 @@ export default function App() {
     engine.onTick!(structuredClone(eng.state), structuredClone(eng.residents), [])
   }, [])
 
+  /**
+   * Fires async LLM calls for residents who should speak this tick.
+   * Injects their messages into the engine when they resolve and pushes
+   * a React state update so the chat bubble appears.
+   *
+   * @param events - events fired this tick (drives speaker selection)
+   * @param snapshotResidents - resident snapshot from this tick
+   * @param snapshotState - building state snapshot from this tick
+   */
+  function triggerResidentSpeaking(
+    events: SimulationEvent[],
+    snapshotResidents: Resident[],
+    snapshotState: BuildingState,
+  ) {
+    if (events.length === 0 && snapshotState.tick % 3 !== 0) return  // skip quiet ticks
+
+    generateResidentMessages(events, snapshotResidents, snapshotState).then((messages) => {
+      if (!messages.length) return
+      const newState = engineRef.current?.injectChatMessages(messages)
+      if (newState) setBuildingState(newState)
+    })
+  }
+
   function handleStart() {
-    engineRef.current?.start()
+    const engine = engineRef.current
+    if (!engine) return
+
+    // On first start (tick === 0), inject the "promoted to admin" system notice
+    const eng = engine as unknown as { state: BuildingState }
+    if (eng.state.tick === 0) {
+      const promoMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        senderId: "system",
+        senderName: "system",
+        content: "הוספת כמנהל קבוצה",   // "You were added as a group admin"
+        tick: 0,
+        type: "system",
+      }
+      const newState = engine.injectChatMessages([promoMsg])
+      setBuildingState(newState)
+    }
+
+    engine.start()
     setIsRunning(true)
   }
 
@@ -65,12 +114,16 @@ export default function App() {
 
   /**
    * Player sends a message.
-   * M4 will route this through LLM analyze → PlayerAction.
-   * For now inserts a player bubble directly so the UI is testable.
+   * 1. Immediately inserts the player bubble into the chat.
+   * 2. Async: calls LLM analyze → PlayerAction → engine.applyPlayerAction.
+   * 3. Async: generates LLM reactions from affected residents.
    */
   const handleSendMessage = useCallback((text: string) => {
     if (!buildingState || buildingState.isGameOver) return
+    const engine = engineRef.current
+    if (!engine) return
 
+    // 1. Show player bubble immediately — don't wait for LLM
     const msg: ChatMessage = {
       id: `player_${Date.now()}`,
       senderId: "player",
@@ -79,13 +132,43 @@ export default function App() {
       tick: buildingState.tick,
       type: "player",
     }
+    const afterPlayer = engine.injectChatMessages([msg])
+    setBuildingState(afterPlayer)
 
-    // Inject into engine and get back the canonical snapshot — avoids a race
-    // where a tick fires between the engine write and a separate functional setState,
-    // which would cause the message to appear twice.
-    const snapshot = engineRef.current?.injectChatMessages([msg])
-    if (snapshot) setBuildingState(snapshot)
-  }, [buildingState])
+    // 2. Analyze the player's message and apply game effects
+    const stateSnapshot = afterPlayer
+    const residentsSnapshot = buildingState  // used for resident list below
+
+    analyzeMessage({
+      callType: "analyze",
+      playerMessage: text,
+      activeIssues: stateSnapshot.activeIssues.filter((i) => !i.isResolved).map((i) => i.type),
+      chaosLevel: stateSnapshot.chaosLevel,
+      residents: residents.map((r) => ({ id: r.id, name: r.name, sentiment: r.currentSentiment })),
+      recentMessages: stateSnapshot.chatMessages.slice(-5).map((m) => `${m.senderName}: ${m.content}`),
+    }).then((result) => {
+      trace.traceLLM({
+        callType: "analyze",
+        prompt: text,
+        rawResponse: JSON.stringify(result.action),
+        parsed: result.action,
+        success: !result.fallbackUsed,
+        fallbackUsed: result.fallbackUsed,
+        latencyMs: 0,  // latency tracked server-side
+        tick: stateSnapshot.tick,
+      })
+
+      engine.applyPlayerAction(result.action)
+
+      // 3. Generate reactions from residents affected by the player's action
+      generateResidentMessages([], residents, stateSnapshot).then((reactions) => {
+        if (!reactions.length) return
+        const newState = engine.injectChatMessages(reactions)
+        setBuildingState(newState)
+      })
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildingState, residents])
 
   /**
    * Dev-only: appends a batch of fake messages directly into state.
