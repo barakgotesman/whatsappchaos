@@ -17,14 +17,18 @@ const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 // ─── System prompts (static — cached by Groq) ─────────────────
 
-const GENERATE_SYSTEM_PROMPT = `You are a message generator for a social simulation game set in an Israeli apartment building WhatsApp group.
-You receive structured data about a resident's personality, current emotional state, and the situation they are reacting to.
-Your job is to write a single WhatsApp message as that resident — in Hebrew (using Israeli casual WhatsApp style), or a mix of Hebrew and English if it fits the character.
-Rules:
-- Output ONLY the message text. No quotes, no explanation, no prefix.
-- Stay true to the persona description exactly — voice, speech patterns, quirks.
-- The message should feel like a real WhatsApp message: short, emotional, sometimes typos, sometimes emoji.
-- Do not resolve the situation or make game decisions. Just react authentically to what happened.`
+const GENERATE_SYSTEM_PROMPT = `You are a WhatsApp message writer for a social simulation game set in an Israeli apartment building group chat.
+You receive a resident's persona, their emotional state, and the recent chat history.
+Write ONE WhatsApp message as that resident — in Hebrew, casual Israeli style.
+
+STRICT RULES:
+1. Output ONLY the message text. No quotes, no labels, no explanation.
+2. LENGTH: 1–2 sentences maximum. Real WhatsApp messages are short. Never write a paragraph.
+3. REPLY TO THE CHAT: Look at the recent messages. React to what others just said — agree, challenge, add gossip, or pointedly ignore someone. Do NOT just narrate the triggering event as if nobody else has spoken.
+4. If ועד הבית (the building manager) wrote something recently, address it directly — thank, question, mock, or express cautious hope — based on your persona.
+5. EMOJIS: Only use emojis if the persona description explicitly mentions using them. If the persona does not mention emojis, use ZERO emojis. Never add emojis to sound expressive.
+6. VOICE: Match the exact vocabulary, sentence structure, and quirks described in the persona. Every character must sound different.
+7. Do NOT repeat phrases from recent messages. Say something new each time.`
 
 const ANALYZE_SYSTEM_PROMPT = `You are an action classifier for a social simulation game.
 The player is the Va'ad Bayit (Building Committee leader) in an Israeli apartment building WhatsApp group.
@@ -121,24 +125,28 @@ async function handleGenerate(
  * The persona description is sent verbatim so the LLM internalizes the character voice.
  */
 function buildGeneratePrompt(req: GenerateMessageRequest): string {
-  return `RESIDENT PERSONA:
+  const moodLabel = req.mood.anger > 70 ? "כועס מאוד" : req.mood.anger > 40 ? "מתוח" : "רגוע יחסית"
+  const trustLabel = req.trustInPlayer > 65 ? "סומך על הועד" : req.trustInPlayer > 40 ? "ספקן" : "לא סומך על הועד"
+  // Surface only the most recent message as the primary thing to react to
+  const lastMessage = req.recentMessages.at(-1) ?? "(שקט בקבוצה)"
+  const olderMessages = req.recentMessages.slice(0, -1)
+
+  return `WHO YOU ARE:
 ${req.personaDescription}
 
-CURRENT STATE:
-- Mood: anger=${req.mood.anger}/100, stress=${req.mood.stress}/100, happiness=${req.mood.happiness}/100
-- Trust in Va'ad Bayit (player): ${req.trustInPlayer}/100
-- Sentiment toward player: ${req.currentSentiment}
+YOUR EMOTIONAL STATE:
+- ${moodLabel} (anger ${req.mood.anger}/100) | ${trustLabel} (trust ${req.trustInPlayer}/100)
 
-SITUATION:
-- Event type: ${req.eventType}
-- Triggered by: ${req.sourceResidentName}
-- Severity: ${req.severity}/100
-- Active building issues: ${req.activeIssues.join(", ") || "none"}
+WHAT TRIGGERED YOU TO WRITE:
+- ${req.eventType} (severity ${req.severity}/100)
 
-RECENT CHAT (last 5 messages):
-${req.recentMessages.join("\n") || "(no messages yet)"}
+RECENT CHAT CONTEXT:
+${olderMessages.join("\n") || "(אין הודעות קודמות)"}
 
-Write the resident's WhatsApp message now:`
+THE LAST MESSAGE YOU ARE REACTING TO:
+>>> ${lastMessage}
+
+Write your WhatsApp message now. React specifically to that last message — agree, challenge, add something, or address the sender by name. Pick ONE topic. Do not list everything.`
 }
 
 /**

@@ -26,23 +26,26 @@ let lastMessageAt = 0
 const residentLastSpokeAt = new Map<string, number>()
 
 /**
- * Entry point called after each engine tick.
+ * Entry point called after each engine tick or player message.
  * Selects which residents speak, generates their LLM messages, and returns
  * ChatMessage[] ready to be injected into the engine.
  *
  * @param events - SimulationEvents fired this tick (used to pick speakers)
  * @param residents - current resident snapshots
  * @param state - current building state snapshot
+ * @param forceSpeak - if true, bypasses the time gap and guarantees at least one speaker
+ *                     (used after the player sends a message so someone always replies)
  */
 export async function generateResidentMessages(
   events: SimulationEvent[],
   residents: Resident[],
   state: BuildingState,
+  forceSpeak = false,
 ): Promise<ChatMessage[]> {
-  // Enforce minimum gap — skip this tick entirely if too soon after the last message
-  if (Date.now() - lastMessageAt < MIN_MESSAGE_GAP_MS) return []
+  // Enforce minimum gap — skip unless forceSpeak is set
+  if (!forceSpeak && Date.now() - lastMessageAt < MIN_MESSAGE_GAP_MS) return []
 
-  const speakers = selectSpeakers(events, residents, state)
+  const speakers = selectSpeakers(events, residents, state, forceSpeak)
   if (speakers.length === 0) return []
 
   // MAX_SPEAKERS_PER_TICK is 1 so there is always exactly one call
@@ -75,28 +78,38 @@ export async function generateResidentMessages(
  * Chooses up to MAX_SPEAKERS_PER_TICK residents to speak this tick.
  * Priority: residents directly involved in events first,
  * then high-mood spontaneous speakers sorted by anger + stress.
+ * When forceSpeak is true, the cooldown is relaxed so someone always replies.
  *
  * @param events - events that fired this tick
  * @param residents - all residents
  * @param state - current building state (used for chaos context)
+ * @param forceSpeak - if true, relaxes per-resident cooldown to guarantee a speaker
  */
 function selectSpeakers(
   events: SimulationEvent[],
   residents: Resident[],
   state: BuildingState,
+  forceSpeak = false,
 ): Array<{ resident: Resident; event: SimulationEvent }> {
   const now = Date.now()
-  // Exclude residents who spoke too recently — enforces chat diversity
+  // In forced mode, use a shorter cooldown (20s instead of 30s) so someone always
+  // replies to the player, but the same resident can't speak back-to-back within a session.
+  const cooldown = forceSpeak ? 20000 : MIN_RESIDENT_COOLDOWN_MS
   const active = residents.filter(
-    (r) => r.isActive && !r.isMuted && (now - (residentLastSpokeAt.get(r.id) ?? 0)) >= MIN_RESIDENT_COOLDOWN_MS,
+    (r) => r.isActive && !r.isMuted && (now - (residentLastSpokeAt.get(r.id) ?? 0)) >= cooldown,
   )
   const selected: Array<{ resident: Resident; event: SimulationEvent }> = []
   const used = new Set<string>()
 
-  // Event-driven: the source resident of each event speaks first
+  // Event-driven: the source resident of each event speaks first.
+  // Infrastructure events have sourceId="building" (not a resident), so we fall back
+  // to the angriest eligible resident — they're the most likely to react to the issue.
   for (const event of events) {
     if (selected.length >= MAX_SPEAKERS_PER_TICK) break
-    const resident = active.find((r) => r.id === event.sourceId && !used.has(r.id))
+    const eligible = active.filter((r) => !used.has(r.id))
+    const resident = event.sourceId === "building"
+      ? eligible.slice().sort((a, b) => b.mood.anger - a.mood.anger)[0]
+      : eligible.find((r) => r.id === event.sourceId)
     if (resident) {
       selected.push({ resident, event })
       used.add(resident.id)
@@ -105,16 +118,26 @@ function selectSpeakers(
 
   // Spontaneous: high-mood residents may speak even without a direct event
   if (selected.length < MAX_SPEAKERS_PER_TICK) {
-    const spontaneous = active
-      .filter((r) => !used.has(r.id) && shouldSpeakSpontaneously(r))
+    const eligible = active.filter((r) => !used.has(r.id))
+    const spontaneous = eligible
+      .filter((r) => shouldSpeakSpontaneously(r))
       .sort((a, b) => b.mood.anger + b.mood.stress - (a.mood.anger + a.mood.stress))
 
     for (const resident of spontaneous) {
       if (selected.length >= MAX_SPEAKERS_PER_TICK) break
-      // Give them the most severe event for context, or invent a neutral one
       const event = events[0] ?? makeDummyEvent(resident.id, state.tick)
       selected.push({ resident, event })
       used.add(resident.id)
+    }
+
+    // In forced mode, if still nobody selected, pick the most emotionally activated
+    // resident regardless of spontaneous probability — the player must get a reply
+    if (forceSpeak && selected.length === 0 && eligible.length > 0) {
+      const mostActivated = eligible
+        .slice()
+        .sort((a, b) => b.mood.anger + b.mood.stress - (a.mood.anger + a.mood.stress))[0]
+      const event = events[0] ?? makeDummyEvent(mostActivated.id, state.tick)
+      selected.push({ resident: mostActivated, event })
     }
   }
 

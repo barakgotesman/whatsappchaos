@@ -185,8 +185,8 @@ export default function App() {
 
       engine.applyPlayerAction(result.action)
 
-      // 3. Generate reactions from residents affected by the player's action
-      generateResidentMessages([], residents, stateSnapshot).then((reactions) => {
+      // 3. Generate reactions — force at least one resident to reply to the player
+      generateResidentMessages([], residents, stateSnapshot, true).then((reactions) => {
         if (isLlmCircuitOpen()) { checkLlmFatal(); return }
         if (!reactions.length) return
         const newState = engine.injectChatMessages(reactions)

@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm create *)",
+      "Bash(npm --version)",
+      "Bash(npm create *)",
+      "Bash(npm install *)",
+      "Bash(npx tailwindcss *)",
+      "Bash(npx shadcn@latest init --defaults)",
+      "Bash(node -e \"const tw = require\\('tailwindcss'\\); console.log\\(tw.version || 'no version'\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/tailwindcss/package.json'\\).version\\)\")",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(npm test *)",
+      "mcp__stitch__list_projects",
+      "Bash(node *)",
+      "mcp__stitch__list_screens",
+      "mcp__stitch__get_screen",
+      "WebFetch(domain:contribution.usercontent.google.com)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(npx kill-port *)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(curl -s \"https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ7Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpaCiVodG1sXzAwMDY1MWViZjU4ZTljZWMwMjNiZGJjZGQ1MzUzZWViEgsSBxDP6YTAjRIYAZIBIwoKcHJvamVjdF9pZBIVQhM2MDU1MTkxNDQ4MTA1MDg3NDE0&filename=&opi=89354086\" -o /tmp/stitch_desktop.html)",
+      "Read(//tmp/**)",
+      "Bash(npx shadcn@latest *)",
+      "Bash(vercel --version)",
+      "Bash(vercel whoami *)",
+      "Bash(vercel teams *)",
+      "Bash(vercel link *)",
+      "Bash(vercel env *)",
+      "Bash(vercel *)",
+      "Bash(curl *)"
+    ]
+  }
+}
