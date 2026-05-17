@@ -55,6 +55,11 @@ export default function App() {
 
     engineRef.current = engine
 
+    // Expose engine on window in dev mode so the console can manipulate state during testing
+    if (trace.isDevMode()) {
+      (window as unknown as Record<string, unknown>).__engine = engine
+    }
+
     // Push initial snapshot before first tick so UI renders immediately.
     // Private field access via cast — isolated to this one-time init.
     const eng = engine as unknown as { state: BuildingState; residents: Resident[] }

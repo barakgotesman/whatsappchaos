@@ -12,12 +12,14 @@ import { SENDER_ID, PLAYER_LLM_NAME } from "@/constants"
 /** Only one resident speaks per tick — keeps chat readable and limits LLM calls */
 const MAX_SPEAKERS_PER_TICK = 1
 
-/** Minimum real-time ms between any two resident messages — prevents spam */
-const MIN_MESSAGE_GAP_MS = 8000
+/** Minimum real-time ms between any two resident messages — prevents spam.
+ *  6s keeps resident output under ~10/min, leaving headroom for player analyze+generate
+ *  calls without hitting Groq's 30 RPM rate limit. */
+const MIN_MESSAGE_GAP_MS = 6000
 
 /** Per-resident cooldown — a resident who just spoke waits this long before speaking again.
  *  Prevents any single resident from monopolizing the chat. */
-const MIN_RESIDENT_COOLDOWN_MS = 30000
+const MIN_RESIDENT_COOLDOWN_MS = 20000
 
 /** Timestamp of the last resident message sent — enforces MIN_MESSAGE_GAP_MS */
 let lastMessageAt = 0

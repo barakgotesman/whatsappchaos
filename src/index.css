@@ -450,7 +450,7 @@
   }
 
   .dev-panel-header {
-    @apply px-4 py-3 text-xs font-bold tracking-widest shrink-0;
+    @apply flex items-center justify-between px-4 py-3 text-xs font-bold tracking-widest shrink-0;
     color: #7c3aed;
     border-bottom: 1px solid #21262d;
     background: #0d1117;
@@ -577,6 +577,38 @@
     @apply text-[9px] px-1 py-0.5 rounded font-bold;
     background: #2d2208;
     color: #d29922;
+  }
+
+  /* Mock mode toggle button — green pill when on, dim when off */
+  .dev-mock-row {
+    @apply flex items-center gap-2 px-3 py-2;
+    border-bottom: 1px solid #21262d;
+  }
+
+  .dev-mock-btn {
+    @apply text-[10px] font-bold px-2 py-1 rounded-full border-none cursor-pointer transition-colors;
+  }
+
+  .dev-mock-btn--on {
+    background: #1a4731;
+    color: #3fb950;
+  }
+
+  .dev-mock-btn--off {
+    background: #21262d;
+    color: #484f58;
+  }
+
+  .dev-mock-label {
+    @apply text-[10px];
+    color: #3fb950;
+  }
+
+  /* Persistent badge in panel header — always visible when mock is active */
+  .dev-mock-active-badge {
+    @apply text-[10px] font-bold px-2 py-0.5 rounded-full;
+    background: #1a4731;
+    color: #3fb950;
   }
 
   .dev-llm-detail {

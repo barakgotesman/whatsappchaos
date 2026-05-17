@@ -59,6 +59,8 @@ class TraceStore {
   /** True only when URL has ?dev=1. Computed once at startup. */
   private readonly devMode: boolean
 
+  /** Whether mock LLM mode is currently active. Only meaningful when devMode is true. */
+  private mockMode = false
 
   private events: EventTraceEntry[] = []
   private residents: ResidentTraceEntry[] = []
@@ -81,6 +83,17 @@ class TraceStore {
   /** Returns true if ?dev=1 is present in the URL. Use this to conditionally render dev UI. */
   isDevMode(): boolean {
     return this.devMode
+  }
+
+  /** True only when BOTH ?dev=1 is present AND mock mode is toggled on. Prevents accidental prod activation. */
+  isMockMode(): boolean {
+    return this.devMode && this.mockMode
+  }
+
+  /** Toggles mock LLM mode on or off. Notifies all subscribers so DevPanel re-renders immediately. */
+  setMockMode(on: boolean): void {
+    this.mockMode = on
+    this.notify()
   }
 
   // ─── Trace methods — all are no-ops when devMode is false ───

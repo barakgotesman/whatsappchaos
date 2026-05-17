@@ -120,10 +120,14 @@ export class SimulationEngine {
       case "support_resident":
         if (target) {
           // Supporting a resident raises their trust and lowers anger — noticeable swing
-          target.trustInPlayer = clamp(target.trustInPlayer + 15 * intensityFactor)
-          target.mood.anger = clamp(target.mood.anger - 18 * intensityFactor)
-          target.mood.happiness = clamp(target.mood.happiness + 10 * intensityFactor)
-          this.state.voteSentiment = clamp(this.state.voteSentiment + 6 * intensityFactor)
+          target.trustInPlayer = clamp(target.trustInPlayer + 22 * intensityFactor)
+          target.mood.anger = clamp(target.mood.anger - 25 * intensityFactor)
+          target.mood.happiness = clamp(target.mood.happiness + 15 * intensityFactor)
+          this.state.voteSentiment = clamp(this.state.voteSentiment + 10 * intensityFactor)
+          // Bystanders see a supportive Va'ad and trust slightly more
+          for (const r of this.residents.filter((r) => r.isActive && r.id !== target.id)) {
+            r.trustInPlayer = clamp(r.trustInPlayer + 3 * intensityFactor)
+          }
         }
         break
 
@@ -138,31 +142,33 @@ export class SimulationEngine {
         break
 
       case "de_escalate":
-        // Calms everyone down — meaningful chaos reduction
+        // Calms everyone down — meaningful chaos and anger reduction
         for (const r of this.residents.filter((r) => r.isActive)) {
-          r.mood.anger = clamp(r.mood.anger - 12 * intensityFactor)
-          r.mood.stress = clamp(r.mood.stress - 10 * intensityFactor)
-          r.mood.happiness = clamp(r.mood.happiness + 5 * intensityFactor)
+          r.mood.anger = clamp(r.mood.anger - 18 * intensityFactor)
+          r.mood.stress = clamp(r.mood.stress - 15 * intensityFactor)
+          r.mood.happiness = clamp(r.mood.happiness + 8 * intensityFactor)
+          r.trustInPlayer = clamp(r.trustInPlayer + 4 * intensityFactor)
         }
-        this.state.chaosLevel = clamp(this.state.chaosLevel - 8 * intensityFactor)
-        this.state.voteSentiment = clamp(this.state.voteSentiment + 3 * intensityFactor)
+        this.state.chaosLevel = clamp(this.state.chaosLevel - 14 * intensityFactor)
+        this.state.voteSentiment = clamp(this.state.voteSentiment + 6 * intensityFactor)
         break
 
       case "promise":
         // Promise raises vote sentiment and trust — felt across the whole group
-        this.state.voteSentiment = clamp(this.state.voteSentiment + 10 * intensityFactor)
+        this.state.voteSentiment = clamp(this.state.voteSentiment + 16 * intensityFactor)
         for (const r of this.residents.filter((r) => r.isActive)) {
-          r.trustInPlayer = clamp(r.trustInPlayer + 7 * intensityFactor)
-          r.mood.stress = clamp(r.mood.stress - 5 * intensityFactor)
+          r.trustInPlayer = clamp(r.trustInPlayer + 12 * intensityFactor)
+          r.mood.stress = clamp(r.mood.stress - 8 * intensityFactor)
+          r.mood.happiness = clamp(r.mood.happiness + 5 * intensityFactor)
         }
         break
 
       case "shift_blame":
         // Shifting blame reduces chaos but shrewd residents see through it
-        this.state.chaosLevel = clamp(this.state.chaosLevel - 6 * intensityFactor)
+        this.state.chaosLevel = clamp(this.state.chaosLevel - 10 * intensityFactor)
         for (const r of this.residents.filter((r) => r.isActive)) {
           const seesThrough = r.traits.stubbornness > 60
-          r.trustInPlayer = clamp(r.trustInPlayer + (seesThrough ? -6 : 3) * intensityFactor)
+          r.trustInPlayer = clamp(r.trustInPlayer + (seesThrough ? -6 : 5) * intensityFactor)
         }
         break
 
@@ -170,20 +176,26 @@ export class SimulationEngine {
         // Authority assertion: respect-high residents calm down; low-respect push back hard
         for (const r of this.residents.filter((r) => r.isActive)) {
           const respectFactor = r.traits.authorityRespect / 100
-          r.mood.anger = clamp(r.mood.anger - 15 * intensityFactor * respectFactor)
+          r.mood.anger = clamp(r.mood.anger - 20 * intensityFactor * respectFactor)
+          r.mood.stress = clamp(r.mood.stress - 10 * intensityFactor * respectFactor)
           r.trustInPlayer = clamp(
-            r.trustInPlayer + 8 * intensityFactor * respectFactor - 5 * intensityFactor * (1 - respectFactor)
+            r.trustInPlayer + 12 * intensityFactor * respectFactor - 5 * intensityFactor * (1 - respectFactor)
           )
         }
+        this.state.voteSentiment = clamp(this.state.voteSentiment + 5 * intensityFactor)
         break
 
       case "acknowledge_complaint":
         if (target) {
           // Acknowledging validates the resident — meaningful trust gain, anger drops
-          target.trustInPlayer = clamp(target.trustInPlayer + 12 * intensityFactor)
-          target.mood.anger = clamp(target.mood.anger - 14 * intensityFactor)
-          target.mood.happiness = clamp(target.mood.happiness + 8 * intensityFactor)
-          this.state.voteSentiment = clamp(this.state.voteSentiment + 3 * intensityFactor)
+          target.trustInPlayer = clamp(target.trustInPlayer + 20 * intensityFactor)
+          target.mood.anger = clamp(target.mood.anger - 22 * intensityFactor)
+          target.mood.happiness = clamp(target.mood.happiness + 14 * intensityFactor)
+          this.state.voteSentiment = clamp(this.state.voteSentiment + 8 * intensityFactor)
+          // Empathy ripple — others appreciate the Va'ad listening
+          for (const r of this.residents.filter((r) => r.isActive && r.id !== target.id)) {
+            r.trustInPlayer = clamp(r.trustInPlayer + 2 * intensityFactor)
+          }
         }
         break
 

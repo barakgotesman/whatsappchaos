@@ -71,14 +71,15 @@ export function resolve(
 
   // ── Chaos passive decay ───────────────────────────────────────
   // Without this, chaos is a one-way ratchet: events push it up but nothing
-  // brings it back down between events. 1.0/tick gives a natural "resting point"
-  // and makes the first few minutes of play survivable.
-  deltas.chaosDelta -= 1.0
+  // brings it back down between events. 2.0/tick gives a more forgiving resting
+  // point so the player has time to react to events before losing.
+  deltas.chaosDelta -= 2.0
 
   // ── Aggregate anger → chaos ──────────────────────────────────
   // Total anger across all residents pushes chaos up; happiness pushes it down.
   // Only positive anger deltas count — passive decay (-2/tick baseline) should
   // lower residents' anger, not directly pull chaos down (that's the decay above).
+  // Multiplier kept low (0.35) so two angry residents can't spiral chaos uncontrollably.
   let totalAngerDelta = 0
   let totalHappinessDelta = 0
   for (const reaction of reactions.values()) {
@@ -86,12 +87,12 @@ export function resolve(
     totalHappinessDelta += Math.max(0, reaction.happinessDelta)
   }
   const activeCount = residents.filter((r) => r.isActive).length || 1
-  deltas.chaosDelta += (totalAngerDelta / activeCount) * 0.8
-  deltas.chaosDelta -= (totalHappinessDelta / activeCount) * 0.3
+  deltas.chaosDelta += (totalAngerDelta / activeCount) * 0.35
+  deltas.chaosDelta -= (totalHappinessDelta / activeCount) * 0.4
 
   // ── Phase-based chaos pressure ────────────────────────────────
-  // Crisis phase escalates chaos faster; intro phase is damped
-  if (state.phase === PHASE.CRISIS) deltas.chaosDelta += 1.5
+  // Crisis phase adds pressure but not so much that it auto-loses the player.
+  if (state.phase === PHASE.CRISIS) deltas.chaosDelta += 0.5
   if (state.phase === PHASE.INTRO)  deltas.chaosDelta -= 1.0
 
   // ── Vote sentiment ───────────────────────────────────────────
@@ -123,11 +124,11 @@ export function resolve(
           isResolved: false,
         })
         // Opening a new issue raises noise level and chaos
-        deltas.noiseDelta += event.severity * 0.1
-        deltas.chaosDelta += event.severity * 0.05
+        deltas.noiseDelta += event.severity * 0.08
+        deltas.chaosDelta += event.severity * 0.025
       } else {
         // Re-triggering an existing open issue escalates severity → more chaos
-        deltas.chaosDelta += event.severity * 0.03
+        deltas.chaosDelta += event.severity * 0.015
       }
     }
   }
@@ -173,8 +174,8 @@ export function resolve(
 
       // Feuding residents who are both angry deepen hostility → chaos spike
       if (rel.alliance === ALLIANCE.FEUDING) {
-        deltas.chaosDelta += 2
-        deltas.voteSentimentDelta -= 2
+        deltas.chaosDelta += 0.8
+        deltas.voteSentimentDelta -= 1
       }
     }
   }

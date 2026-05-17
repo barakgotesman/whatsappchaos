@@ -121,11 +121,18 @@ function MoodBar({ label, value }: { label: string; value: number }) {
 
 // ─── LLM Log tab ─────────────────────────────────────────────
 
-/** Shows every Groq call: type, latency, success/fallback, prompt + response collapsed */
+/** Shows every Groq call: type, latency, success/fallback, prompt + response collapsed. Includes mock mode toggle. */
 function LLMLog({ entries }: { entries: LLMTraceEntry[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [mockOn, setMockOn] = useState(() => trace.isMockMode())
 
-  if (entries.length === 0) return <DevEmpty>No LLM calls yet — LLM wires up in M4.</DevEmpty>
+  function toggleMock() {
+    const next = !mockOn
+    trace.setMockMode(next)
+    setMockOn(next)
+  }
+
+  const emptyBody = entries.length === 0
 
   function toggle(id: string) {
     setExpanded((prev) => {
@@ -137,6 +144,19 @@ function LLMLog({ entries }: { entries: LLMTraceEntry[] }) {
 
   return (
     <div className="dev-list">
+      {/* Mock mode toggle — always visible at top of LLM tab */}
+      <div className="dev-mock-row">
+        <button
+          onClick={toggleMock}
+          className={mockOn ? "dev-mock-btn dev-mock-btn--on" : "dev-mock-btn dev-mock-btn--off"}
+        >
+          🤖 {mockOn ? "MOCK ON" : "MOCK OFF"}
+        </button>
+        {mockOn && (
+          <span className="dev-mock-label">No API calls — scripted Hebrew responses</span>
+        )}
+      </div>
+      {emptyBody && <DevEmpty>No LLM calls yet — send a message or wait for a resident to speak.</DevEmpty>}
       {[...entries].reverse().map((e) => (
         <div key={e.id} className="dev-llm-entry">
           <div className="dev-row" onClick={() => toggle(e.id)} style={{ cursor: "pointer" }}>
@@ -233,7 +253,7 @@ function moodColor(v: number): string {
 export function DevPanel() {
   const [tab, setTab] = useState<Tab>("events")
 
-  // Re-render whenever traceStore emits new data
+  // Re-render whenever traceStore emits new data (includes mock mode toggles)
   const [, setRevision] = useState(0)
   useEffect(() => trace.subscribe(() => setRevision((r) => r + 1)), [])
 
@@ -241,11 +261,16 @@ export function DevPanel() {
   const residents = trace.getResidents()
   const llmCalls  = trace.getLLMCalls()
   const diffs     = trace.getDiffs()
+  const mockActive = trace.isMockMode()
 
   return (
     <TooltipProvider delayDuration={300}>
     <aside className="dev-panel">
-      <div className="dev-panel-header">DEV PANEL</div>
+      <div className="dev-panel-header">
+        DEV PANEL
+        {/* Persistent badge visible from every tab so mock mode is never forgotten */}
+        {mockActive && <span className="dev-mock-active-badge">🤖 MOCK</span>}
+      </div>
 
       <div className="dev-tabs">
         <TabBtn label={`Events (${events.length})`}    active={tab === "events"}    onClick={() => setTab("events")} />
