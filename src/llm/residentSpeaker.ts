@@ -13,9 +13,9 @@ import { SENDER_ID, PLAYER_LLM_NAME } from "@/constants"
 const MAX_SPEAKERS_PER_TICK = 1
 
 /** Minimum real-time ms between any two resident messages — prevents spam.
- *  6s keeps resident output under ~10/min, leaving headroom for player analyze+generate
- *  calls without hitting Groq's 30 RPM rate limit. */
-const MIN_MESSAGE_GAP_MS = 6000
+ *  12s caps ambient output at ~5 calls/min so the Groq token budget (TPM/TPD), not just
+ *  the request limit, survives a full session; player replies bypass it via forceSpeak. */
+const MIN_MESSAGE_GAP_MS = 12000
 
 /** Per-resident cooldown — a resident who just spoke waits this long before speaking again.
  *  Prevents any single resident from monopolizing the chat. */
@@ -191,11 +191,11 @@ async function generateForResident(
   residents: Resident[],
 ): Promise<ChatMessage | null> {
   const sourceResident = residents.find((r) => r.id === event.sourceId)
-  // Last 5 messages as plain strings for LLM context.
+  // Last 3 messages as plain strings for LLM context.
   // Replace "אתה" (UI label for the player) with "ועד הבית" so the LLM understands
   // who sent the message — "אתה" is a Hebrew pronoun that means nothing to the model.
   const recentMessages = state.chatMessages
-    .slice(-5)
+    .slice(-3)
     .map((m) => `${m.senderId === SENDER_ID.PLAYER ? PLAYER_LLM_NAME : m.senderName}: ${m.content}`)
 
   const req: GenerateMessageRequest = {

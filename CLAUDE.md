@@ -57,7 +57,7 @@ All design tokens (colors, spacing) live in `index.css` as CSS custom properties
 | UI Components | shadcn/ui |
 | Design System | Stitch project "whatsappchaos" |
 | Styling | Tailwind CSS (via shadcn) |
-| LLM | Groq API (llama-3.3-70b-versatile) |
+| LLM | Groq API (openai/gpt-oss-120b) |
 | LLM Gateway | Vercel Serverless Function (`/api/groq`) |
 | Deploy | Vercel |
 | Language | TypeScript throughout (strict mode) |

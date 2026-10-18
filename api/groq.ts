@@ -9,50 +9,36 @@ import type {
 
 // ─── Constants ────────────────────────────────────────────────
 
-/** Groq model — llama-3.3-70b-versatile replaces the decommissioned llama3-70b-8192 */
-const GROQ_MODEL = "llama-3.3-70b-versatile"
+/** Groq model — llama-3.3-70b-versatile was withdrawn from our account; gpt-oss-120b has the
+ *  best Hebrew of the models still available (qwen3.8-27b broke length rules, gpt-oss-20b truncated). */
+const GROQ_MODEL = "openai/gpt-oss-120b"
 
 /** Groq API endpoint */
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-// ─── System prompts (static — cached by Groq) ─────────────────
+/** Chat lines of context sent per generate call — each Hebrew line costs ~30-60 tokens */
+const CONTEXT_MESSAGES = 3
 
-const GENERATE_SYSTEM_PROMPT = `You are a WhatsApp message writer for a social simulation game set in an Israeli apartment building group chat.
-You receive a resident's persona, their emotional state, and the recent chat history.
-Write ONE WhatsApp message as that resident — in Hebrew, casual Israeli style.
+/** Max characters per chat line sent to the LLM (Hebrew tokenizes ~1 token per 1-2 chars) */
+const MAX_LINE_CHARS = 140
 
-STRICT RULES:
-1. Output ONLY the message text. No quotes, no labels, no explanation.
-2. LENGTH: 1–2 sentences maximum. Real WhatsApp messages are short. Never write a paragraph.
-3. REPLY TO THE CHAT: Look at the recent messages. React to what others just said — agree, challenge, add gossip, or pointedly ignore someone. Do NOT just narrate the triggering event as if nobody else has spoken.
-4. If ועד הבית (the building manager) wrote something recently, address it directly — thank, question, mock, or express cautious hope — based on your persona.
-5. EMOJIS: Only use emojis if the persona description explicitly mentions using them. If the persona does not mention emojis, use ZERO emojis. Never add emojis to sound expressive.
-6. VOICE: Match the exact vocabulary, sentence structure, and quirks described in the persona. Every character must sound different.
-7. Do NOT repeat phrases from recent messages. Say something new each time.`
+/** Output caps. Groq counts max_tokens against the per-minute budget up front, so keep tight.
+ *  gpt-oss is a reasoning model: reasoning tokens (~60-100 at "low" effort) come out of this
+ *  budget, and anything below ~150 can return an EMPTY message. Measured outputs: ~100-140. */
+const GENERATE_MAX_TOKENS = 200
+const ANALYZE_MAX_TOKENS = 200
 
-const ANALYZE_SYSTEM_PROMPT = `You are an action classifier for a social simulation game.
-The player is the Va'ad Bayit (Building Committee leader) in an Israeli apartment building WhatsApp group.
-You receive the player's typed message and context about the current game state.
-Classify the player's intent into one of these action types:
-- support_resident: player agrees with or defends a specific resident
-- oppose_resident: player disagrees with or calls out a specific resident
-- de_escalate: general calming or mediating message
-- promise: player commits to fixing something specific
-- shift_blame: redirects blame to another party
-- assert_authority: reminds group of Va'ad Bayit role and responsibilities
-- acknowledge_complaint: validates a complaint without committing to action
-- ignore: message has no meaningful game action
-- ambiguous: cannot confidently classify
+/** Minimal reasoning: this is style transfer / classification, not a problem to think through */
+const REASONING_EFFORT = "low"
 
-Output ONLY valid JSON matching this exact schema. No explanation, no markdown, no extra text:
-{
-  "type": "<action type>",
-  "targetId": "<resident id or null>",
-  "intensity": <0-100>,
-  "topic": "<issue type or null>",
-  "promiseDetails": "<one sentence or null>",
-  "confidence": <0.0-1.0>
-}`
+// ─── System prompts (static) ─────────────────
+
+const GENERATE_SYSTEM_PROMPT = `Write ONE Hebrew WhatsApp message from an Israeli building-group resident, in the voice of the given persona.
+Rules: output only the message text; 1-2 short sentences; react to the last message (agree, challenge, gossip, or address the sender by name); if ועד הבית spoke, address it; emojis only if the persona says so; don't repeat phrases from the chat.`
+
+const ANALYZE_SYSTEM_PROMPT = `Classify a Va'ad Bayit (building committee leader) chat message into one action type:
+support_resident, oppose_resident, de_escalate, promise, shift_blame, assert_authority, acknowledge_complaint, ignore, ambiguous.
+Output ONLY JSON: {"type":"<type>","targetId":"<resident id or null>","intensity":<0-100>,"topic":"<issue or null>","promiseDetails":"<one sentence or null>","confidence":<0.0-1.0>}`
 
 // ─── Main handler ─────────────────────────────────────────────
 
@@ -130,28 +116,17 @@ async function handleGenerate(
  * The persona description is sent verbatim so the LLM internalizes the character voice.
  */
 function buildGeneratePrompt(req: GenerateMessageRequest): string {
-  const moodLabel = req.mood.anger > 70 ? "כועס מאוד" : req.mood.anger > 40 ? "מתוח" : "רגוע יחסית"
+  const moodLabel = req.mood.anger > 70 ? "כועס מאוד" : req.mood.anger > 40 ? "מתוח" : "רגוע"
   const trustLabel = req.trustInPlayer > 65 ? "סומך על הועד" : req.trustInPlayer > 40 ? "ספקן" : "לא סומך על הועד"
-  // Surface only the most recent message as the primary thing to react to
-  const lastMessage = req.recentMessages.at(-1) ?? "(שקט בקבוצה)"
-  const olderMessages = req.recentMessages.slice(0, -1)
+  // Cap each line: Hebrew is token-expensive and long messages add little signal
+  const clip = (m: string) => (m.length > MAX_LINE_CHARS ? m.slice(0, MAX_LINE_CHARS) + "…" : m)
+  const lines = req.recentMessages.slice(-CONTEXT_MESSAGES).map(clip)
+  const lastMessage = lines.at(-1) ?? "(שקט בקבוצה)"
+  const older = lines.slice(0, -1)
 
-  return `WHO YOU ARE:
-${req.personaDescription}
-
-YOUR EMOTIONAL STATE:
-- ${moodLabel} (anger ${req.mood.anger}/100) | ${trustLabel} (trust ${req.trustInPlayer}/100)
-
-WHAT TRIGGERED YOU TO WRITE:
-- ${req.eventType} (severity ${req.severity}/100)
-
-RECENT CHAT CONTEXT:
-${olderMessages.join("\n") || "(אין הודעות קודמות)"}
-
-THE LAST MESSAGE YOU ARE REACTING TO:
->>> ${lastMessage}
-
-Write your WhatsApp message now. React specifically to that last message — agree, challenge, add something, or address the sender by name. Pick ONE topic. Do not list everything.`
+  return `${req.personaDescription}
+מצב: ${moodLabel}, ${trustLabel}. נושא: ${req.eventType}.
+${older.map((l) => l + "\n").join("")}>>> ${lastMessage}`
 }
 
 /**
@@ -219,20 +194,15 @@ async function handleAnalyze(
  * Builds the dynamic user prompt for a player-message analysis call.
  */
 function buildAnalyzePrompt(req: AnalyzePlayerMessageRequest): string {
-  const residentList = req.residents
-    .map((r) => `${r.id} (${r.name}, sentiment: ${r.sentiment})`)
-    .join(", ")
+  // Only ids + names: sentiment doesn't affect classification, and ids are needed for targetId
+  const residentList = req.residents.map((r) => `${r.id}=${r.name}`).join(", ")
+  const recent = req.recentMessages.slice(-2).map((m) => (m.length > MAX_LINE_CHARS ? m.slice(0, MAX_LINE_CHARS) + "…" : m))
 
-  return `PLAYER MESSAGE: "${req.playerMessage}"
-
-GAME CONTEXT:
-- Active issues: ${req.activeIssues.join(", ") || "none"}
-- Current chaos level: ${req.chaosLevel}/100
-- Residents in group: ${residentList}
-- Recent chat (last 5 messages):
-${req.recentMessages.join("\n") || "(no messages yet)"}
-
-Classify the player's action:`
+  return `Message: "${req.playerMessage}"
+Issues: ${req.activeIssues.join(", ") || "none"}
+Residents: ${residentList}
+Recent:
+${recent.join("\n") || "(none)"}`
 }
 
 /**
@@ -271,6 +241,7 @@ async function callGroq(
   apiKey: string,
   jsonMode: boolean
 ): Promise<GroqResult> {
+  const maxTokens = jsonMode ? ANALYZE_MAX_TOKENS : GENERATE_MAX_TOKENS
   try {
     const body: Record<string, unknown> = {
       model: GROQ_MODEL,
@@ -279,7 +250,8 @@ async function callGroq(
         { role: "user", content: userPrompt },
       ],
       temperature: 0.8,   // slightly creative for authentic resident voices
-      max_tokens: 300,    // resident messages and action objects are short
+      max_tokens: maxTokens,
+      reasoning_effort: REASONING_EFFORT,
     }
 
     if (jsonMode) {

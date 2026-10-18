@@ -1,6 +1,6 @@
 # LLM Contracts
 
-Two distinct LLM call types. Both are sent to the Groq API via the Vercel serverless function at `/api/groq`. The LLM model is `llama3-70b-8192` (or `mixtral-8x7b-32768` as fallback).
+Two distinct LLM call types. Both are sent to the Groq API via the Vercel serverless function at `/api/groq`. The LLM model is `openai/gpt-oss-120b` with `reasoning_effort: "low"` (a reasoning model — keep `max_tokens` ≥ 200 or the reply comes back empty).
 
 All responses must be valid JSON. The serverless function retries once on parse failure, then falls back to a template string.
 
