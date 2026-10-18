@@ -71,43 +71,36 @@
     background: radial-gradient(circle, rgba(79,240,127,0.12) 0%, transparent 70%);
   }
 
-  /* ── iPhone frame ─────────────────────────────────────────
-     Height drives the scaling — width is derived from aspect ratio.
-     Use a conservative max-height so input is never cut off.   */
+  /* ── iPhone SVG frame wrapper ─────────────────────────────
+     The SVG scales by height; width is determined by the 430:932 viewBox.
+     overflow:visible lets the side buttons (which protrude outside the viewBox) show. */
   .wa-phone {
-    @apply relative flex flex-col overflow-hidden;
-    /* Limit by both viewport height and a sensible max */
-    height: min(780px, 88vh);
-    /* Width = height × phone aspect ratio 9:19.5 */
-    width: calc(min(780px, 88vh) * 9 / 19.5);
-    /* Border radius scales with phone height */
-    border-radius: calc(min(780px, 88vh) * 0.055);
-    border: 4px solid var(--c-phone-border);
-    background: var(--c-surface);
-    box-shadow:
-      0 0 0 10px var(--c-phone-ring),
-      0 0 0 11px #2b2b2b,
-      0 24px 64px rgba(0,0,0,0.85);
+    @apply relative;
+    height: min(820px, 92vh);
+    /* width = height × (430/932) */
+    width: calc(min(820px, 92vh) * 430 / 932);
   }
 
-  /* Dynamic island */
-  .wa-notch {
-    @apply absolute left-1/2 -translate-x-1/2 z-50 shrink-0;
-    top: 0;
-    width: 100px;
-    height: 24px;
-    background: var(--c-phone-ring);
-    border-radius: 0 0 18px 18px;
+  /* The SVG itself fills the wrapper */
+  .wa-phone-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
   }
 
-  /* Home bar — absolute, purely decorative */
-  .wa-home-bar {
-    @apply absolute left-1/2 -translate-x-1/2 rounded-full pointer-events-none;
-    bottom: 6px;
-    width: 100px;
-    height: 4px;
-    background: rgba(187,203,185,0.3);
-    z-index: 10;
+  /* Content layer — sits below the SVG status bar + Dynamic Island strip.
+     SVG coords: screen starts at y=13, status bar height=54 → content at y=67.
+     67/932 = 7.188%  |  bottom inset y=919 → height = (919-67)/932 = 91.416%
+     Horizontal: screen x=13..417 → left=3.023%, width=93.953%              */
+  .wa-phone-content {
+    @apply absolute flex flex-col overflow-hidden;
+    left:   3.023%;   /* 13/430 */
+    top:    7.188%;   /* (13+54)/932  — below status bar + DI */
+    width:  93.953%;  /* (430-26)/430 */
+    height: 91.416%;  /* (932-13-54-13)/932 */
+    /* Only bottom corners need rounding (top is mid-screen, not at edge) */
+    border-radius: 0 0 calc(min(820px, 92vh) * 0.0472) calc(min(820px, 92vh) * 0.0472);
+    overflow: hidden;
   }
 
   /* ── Header ───────────────────────────────────────────────
@@ -115,8 +108,8 @@
      Text inside uses direction:rtl so Hebrew renders correctly. */
   .wa-header {
     @apply flex items-center gap-1 px-2 shrink-0 z-10;
-    padding-top: 28px;  /* clear the notch */
-    height: 68px;
+    padding-top: 8px;   /* status bar + DI are in the SVG layer above content */
+    height: 62px;
     background: var(--c-surface-low);
     border-bottom: 1px solid var(--c-border);
     direction: ltr;     /* flex stays LTR — icons and group on correct sides */

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react"
+import { IPhoneFrame } from "@/components/IPhoneFrame"
 import type { BuildingState, Resident, ChatMessage, SimulationEvent } from "@/types"
 import { SimulationEngine } from "@/simulation/engine"
 import { Button } from "@/components/ui/button"
@@ -226,80 +227,80 @@ export default function App() {
       <div className="wa-bloom w-64 h-64 top-20 left-20 opacity-30" />
       <div className="wa-bloom w-96 h-96 bottom-20 right-20 opacity-20" />
 
-      {/* ── iPhone frame ── */}
+      {/* ── iPhone SVG frame ── */}
       <div className="wa-phone">
-        {/* Dynamic Island */}
-        <div className="wa-notch" />
+        {/* Decorative SVG shell — pure vector, no interactive content inside */}
+        <IPhoneFrame className="wa-phone-svg" />
 
-        {/* Chat header — tapping group name opens group info */}
-        {buildingState && (
-          <StatusBar
-            state={buildingState}
-            onGroupNameClick={() => setShowGroupInfo(true)}
-            isRunning={isRunning}
-            onTogglePause={isRunning ? handlePause : handleStart}
-          />
-        )}
+        {/* Content layer — sits on top of SVG, absolutely positioned to match screen area */}
+        <div className="wa-phone-content">
+          {/* Chat header — tapping group name opens group info */}
+          {buildingState && (
+            <StatusBar
+              state={buildingState}
+              onGroupNameClick={() => setShowGroupInfo(true)}
+              isRunning={isRunning}
+              onTogglePause={isRunning ? handlePause : handleStart}
+            />
+          )}
 
-        {/* Chat + input */}
-        {buildingState && (
-          <ChatWindow
-            messages={buildingState.chatMessages}
-            onSendMessage={handleSendMessage}
-            disabled={isGameOver || llmFatal}
-            playerSendCount={playerSendCount}
-          />
-        )}
+          {/* Chat + input */}
+          {buildingState && (
+            <ChatWindow
+              messages={buildingState.chatMessages}
+              onSendMessage={handleSendMessage}
+              disabled={isGameOver || llmFatal}
+              playerSendCount={playerSendCount}
+            />
+          )}
 
-        {/* Home bar */}
-        <div className="wa-home-bar" />
+          {/* Group info screen — slides over chat when group name tapped */}
+          {showGroupInfo && (
+            <ResidentPanel
+              residents={residents}
+              onClose={() => setShowGroupInfo(false)}
+            />
+          )}
 
-        {/* Group info screen — slides over chat when group name tapped */}
-        {showGroupInfo && (
-          <ResidentPanel
-            residents={residents}
-            onClose={() => setShowGroupInfo(false)}
-          />
-        )}
-
-        {/* Start overlay */}
-        {!isRunning && !isGameOver && !showGroupInfo && (
-          <div className="wa-start-overlay">
-            <Button onClick={handleStart} variant="ghost" className="wa-start-btn">
-              {hasStarted ? "המשך" : "התחל משחק"}
-            </Button>
-          </div>
-        )}
-
-{/* LLM fatal error overlay — shown when the circuit breaker opens */}
-        {llmFatal && (
-          <div className="wa-gameover">
-            <div className="wa-gameover-card">
-              <div className="text-5xl mb-4">⚠️</div>
-              <div className="wa-gameover-title">המשחק אינו זמין</div>
-              <div className="wa-gameover-reason">שגיאת תקשורת קריטית עם שרת הבינה המלאכותית</div>
-              <Button onClick={() => window.location.reload()} className="wa-start-btn">
-                נסה שוב
+          {/* Start overlay */}
+          {!isRunning && !isGameOver && !showGroupInfo && (
+            <div className="wa-start-overlay">
+              <Button onClick={handleStart} variant="ghost" className="wa-start-btn">
+                {hasStarted ? "המשך" : "התחל משחק"}
               </Button>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Game over overlay */}
-        {isGameOver && (
-          <div className="wa-gameover">
-            <div className="wa-gameover-card">
-              <div className="text-5xl mb-4">{gameResult === "win" ? "🏆" : "🗳️"}</div>
-              <div className="wa-gameover-title">
-                {gameResult === "win" ? "ניצחת!" : "הפסדת"}
+          {/* LLM fatal error overlay — shown when the circuit breaker opens */}
+          {llmFatal && (
+            <div className="wa-gameover">
+              <div className="wa-gameover-card">
+                <div className="text-5xl mb-4">⚠️</div>
+                <div className="wa-gameover-title">המשחק אינו זמין</div>
+                <div className="wa-gameover-reason">שגיאת תקשורת קריטית עם שרת הבינה המלאכותית</div>
+                <Button onClick={() => window.location.reload()} className="wa-start-btn">
+                  נסה שוב
+                </Button>
               </div>
-              <div className="wa-gameover-reason">{buildingState?.gameOverReason}</div>
-              <Button onClick={() => window.location.reload()} className="wa-start-btn">
-                משחק חדש
-              </Button>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Game over overlay */}
+          {isGameOver && (
+            <div className="wa-gameover">
+              <div className="wa-gameover-card">
+                <div className="text-5xl mb-4">{gameResult === "win" ? "🏆" : "🗳️"}</div>
+                <div className="wa-gameover-title">
+                  {gameResult === "win" ? "ניצחת!" : "הפסדת"}
+                </div>
+                <div className="wa-gameover-reason">{buildingState?.gameOverReason}</div>
+                <Button onClick={() => window.location.reload()} className="wa-start-btn">
+                  משחק חדש
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Dev panel + badge — only when ?dev=1 */}
