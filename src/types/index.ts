@@ -155,6 +155,9 @@ export interface BuildingState {
   // ── Chat history ─────────────────────────────────────────
   chatMessages: ChatMessage[]
 
+  // ── Pacing ───────────────────────────────────────────────
+  lastEventTick?: number       // tick of the last NEGATIVE event — drives the cooldown between events
+
   // ── Game result ───────────────────────────────────────────
   isGameOver: boolean
   gameResult?: "win" | "lose"
@@ -170,6 +173,9 @@ export const THRESHOLDS = {
   STABILITY_DECAY_PER_TICK: 0.5, // stability drifts toward chaos each tick
   ANGER_DECAY_PER_TICK: 2,       // resident anger baseline decay each tick
   MAX_CHAT_HISTORY: 200,         // cap stored messages to avoid memory bloat
+  EVENT_COOLDOWN_TICKS: 5,       // min ticks between two negative events (5 × 3s = 15s of breathing room)
+  AWAIT_PLAYER_UNANSWERED: 2,    // this many unanswered resident messages → the group waits for the player
+  AWAIT_PLAYER_WINDOW_TICKS: 10, // …for this many ticks (~30s), then pressure resumes
 } as const
 
 // ─── Simulation Events ───────────────────────────────────────

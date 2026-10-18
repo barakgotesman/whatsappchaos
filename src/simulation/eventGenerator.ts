@@ -1,15 +1,16 @@
 import type { BuildingState, Resident, SimulationEvent, EventType } from "@/types"
 import { THRESHOLDS } from "@/types"
 import { PHASE, EVENT_TYPE } from "@/constants"
+import { isAwaitingPlayer, isPositiveEvent } from "./pacing"
 
 // ─── Event probability tables ─────────────────────────────────
 // Per-tick base probabilities for each event class, by game phase.
 // These are multiplied by state modifiers before rolling.
 
 const BASE_PROB = {
-  infrastructure: { intro: 0.01, tension: 0.04, crisis: 0.10, vote: 0.05 },
-  complaint:      { intro: 0.05, tension: 0.12, crisis: 0.20, vote: 0.08 },
-  social:         { intro: 0.02, tension: 0.06, crisis: 0.12, vote: 0.15 },
+  infrastructure: { intro: 0.01, tension: 0.03, crisis: 0.07, vote: 0.04 },
+  complaint:      { intro: 0.04, tension: 0.08, crisis: 0.14, vote: 0.06 },
+  social:         { intro: 0.02, tension: 0.05, crisis: 0.09, vote: 0.12 },
 } as const
 
 // Infrastructure events are building-level; they pick a random issue type
@@ -45,7 +46,7 @@ export function generate(
 ): SimulationEvent[] {
   if (state.phase === PHASE.ENDED) return []
 
-  const events: SimulationEvent[] = []
+  const candidates: SimulationEvent[] = []
   const phase = state.phase === PHASE.VOTE ? PHASE.VOTE
     : state.phase === PHASE.CRISIS ? PHASE.CRISIS
     : state.phase === PHASE.INTRO  ? PHASE.INTRO
@@ -62,7 +63,7 @@ export function generate(
     // Only fire if not already an active issue of the same type
     const alreadyActive = state.activeIssues.some((i) => i.type === type && !i.isResolved)
     if (!alreadyActive) {
-      events.push(makeEvent(type, "building", undefined, scaledSeverity(state.chaosLevel, rng), state.tick))
+      candidates.push(makeEvent(type, "building", undefined, scaledSeverity(state.chaosLevel, rng), state.tick))
     }
   }
 
@@ -75,7 +76,7 @@ export function generate(
       // Resident picks the complaint type that matches their highest sensitivity
       const type = pickComplaintByResident(source, rng)
       const target = pickTarget(residents, source.id, rng)
-      events.push(makeEvent(type, source.id, target?.id, scaledSeverity(source.mood.anger, rng), state.tick))
+      candidates.push(makeEvent(type, source.id, target?.id, scaledSeverity(source.mood.anger, rng), state.tick))
     }
   }
 
@@ -87,11 +88,19 @@ export function generate(
     const source = pick(residents.filter((r) => r.isActive), rng)
     if (source) {
       const target = pickTarget(residents, source.id, rng)
-      events.push(makeEvent(type, source.id, target?.id, scaledSeverity(state.chaosLevel, rng), state.tick))
+      candidates.push(makeEvent(type, source.id, target?.id, scaledSeverity(state.chaosLevel, rng), state.tick))
     }
   }
 
-  return events
+  // ── Pacing ───────────────────────────────────────────────────
+  // At most ONE event per tick, and negative events are held back (a) during the cooldown
+  // after the previous one and (b) while residents are waiting for the player to answer.
+  // Support signals always get through — good news should never be throttled.
+  const coolingDown = state.lastEventTick !== undefined
+    && state.tick - state.lastEventTick < THRESHOLDS.EVENT_COOLDOWN_TICKS
+  const gated = coolingDown || isAwaitingPlayer(state)
+  const allowed = gated ? candidates.filter(isPositiveEvent) : candidates
+  return allowed.length > 0 ? [pick(allowed, rng)] : []
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -180,6 +189,8 @@ function pickSocialEvent(
     // High chaos favors accusations and rumors
     return rng() < 0.6 ? EVENT_TYPE.PUBLIC_ACCUSATION : EVENT_TYPE.RUMOR_SPREAD
   }
+  // Calm waters and decent standing: lean toward good news so the chat isn't all complaints
+  if (state.voteSentiment >= 55 && rng() < 0.5) return EVENT_TYPE.SUPPORT_SIGNAL
   return pick(SOCIAL_TYPES, rng) as EventType
 }
 

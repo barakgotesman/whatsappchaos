@@ -6,6 +6,7 @@ import { INITIAL_BUILDING_STATE, clamp, derivePhase } from "@/state/buildingStat
 import { INITIAL_RESIDENTS as RESIDENTS } from "@/state/residents"
 import { ALLIANCE, PHASE } from "@/constants"
 import { generate } from "./eventGenerator"
+import { isPositiveEvent } from "./pacing"
 import { react } from "./residentAI"
 import { resolve, applyDeltas, initRelationships } from "./escalation"
 import { trace } from "@/dev/traceStore"
@@ -242,6 +243,8 @@ export class SimulationEngine {
     for (const evt of events) {
       trace.traceEvent(evt, this.state.tick)
     }
+    // Start the cooldown clock for negative events (see eventGenerator pacing)
+    if (events.some((e) => !isPositiveEvent(e))) this.state.lastEventTick = this.state.tick
 
     // ── Resident reactions ─────────────────────────────────────
     const reactions = react(this.residents, events, this.relationships)

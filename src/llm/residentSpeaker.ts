@@ -8,6 +8,7 @@ import type {
 import { generateMessage } from "./groqClient"
 import { trace } from "@/dev/traceStore"
 import { SENDER_ID, PLAYER_LLM_NAME } from "@/constants"
+import { isAwaitingPlayer } from "@/simulation/pacing"
 
 /** Only one resident speaks per tick — keeps chat readable and limits LLM calls */
 const MAX_SPEAKERS_PER_TICK = 1
@@ -53,6 +54,9 @@ export async function generateResidentMessages(
   // Skip if a call is already in flight — prevents concurrent Groq requests that burst the rate limit.
   // forceSpeak bypasses this so the player always gets a reply even if a tick call is in progress.
   if (!forceSpeak && inFlight) return []
+  // Turn-taking: after a couple of unanswered resident messages the group waits for the player
+  // instead of piling on. Expires after a while so a silent player still feels pressure.
+  if (!forceSpeak && isAwaitingPlayer(state)) return []
 
   inFlight = true
   try {
