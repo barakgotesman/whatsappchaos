@@ -34,7 +34,7 @@ const REASONING_EFFORT = "low"
 // ─── System prompts (static) ─────────────────
 
 const GENERATE_SYSTEM_PROMPT = `Write ONE Hebrew WhatsApp message from an Israeli building-group resident, in the voice of the given persona.
-Rules: output only the message text; 1-2 short sentences; react to the last message (agree, challenge, gossip, or address the sender by name); if ועד הבית spoke, address it; emojis only if the persona says so; don't repeat phrases from the chat.`
+Rules: output only the message text; 1-2 short sentences; react to the last message (agree, challenge, gossip, or address the sender by name); if the situation names a target (כלפי), address or mention them by name; write plain Hebrew WITHOUT niqqud/vowel marks; if ועד הבית spoke, address it; emojis only if the persona says so; don't repeat phrases from the chat.`
 
 const ANALYZE_SYSTEM_PROMPT = `Classify a Va'ad Bayit (building committee leader) chat message into one action type:
 support_resident, oppose_resident, de_escalate, promise, shift_blame, assert_authority, acknowledge_complaint, ignore, ambiguous.
@@ -80,6 +80,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+// ─── Event descriptions ───────────────────────────────────────
+
+/** Plain-Hebrew meaning of each event type. The raw label ("support_signal") means nothing to the
+ *  LLM, which then improvises an unrelated topic. `actor: false` = building-level event with no one to blame. */
+const EVENT_DESCRIPTIONS: Record<string, { text: string; actor: boolean }> = {
+  elevator_broken:       { text: "המעלית התקלקלה",                   actor: false },
+  water_leak:            { text: "יש נזילת מים בבניין",              actor: false },
+  power_outage:          { text: "הייתה הפסקת חשמל בבניין",          actor: false },
+  noise_complaint:       { text: "מתלונן על רעש",                    actor: true },
+  cleanliness_complaint: { text: "מתלונן על הלכלוך בלובי",           actor: true },
+  parking_dispute:       { text: "מתלונן על בעיית חניה",             actor: true },
+  pet_complaint:         { text: "מתלונן על חיות מחמד בבניין",       actor: true },
+  renovation_noise:      { text: "מתלונן על רעש שיפוצים",            actor: true },
+  public_accusation:     { text: "מאשים מישהו בפומבי",               actor: true },
+  rumor_spread:          { text: "מפיץ שמועה",                       actor: true },
+  no_confidence_signal:  { text: "מביע חוסר אמון בוועד הבית",        actor: true },
+  support_signal:        { text: "מביע תמיכה גלויה",                 actor: true },
+}
+
+/**
+ * Builds the one-line situation the LLM must react to, e.g.
+ * "אתה מביע תמיכה גלויה (כלפי נועה ותל שפירו)" or "דב מזרחי מתלונן על רעש (כלפי רבקה כהן)".
+ *
+ * @param req - generate request (event type, source/target names, whether the speaker is the source)
+ */
+function describeSituation(req: GenerateMessageRequest): string {
+  const d = EVENT_DESCRIPTIONS[req.eventType]
+  if (!d) return req.eventType
+  const target = req.targetResidentName ? ` (כלפי ${req.targetResidentName})` : ""
+  if (!d.actor) return d.text
+  const actor = req.speakerIsSource ? "אתה" : req.sourceResidentName
+  return `${actor} ${d.text}${target}`
+}
+
 // ─── Generate handler ─────────────────────────────────────────
 
 /**
@@ -107,7 +141,8 @@ async function handleGenerate(
     return { message: generateFallbackMessage(req.residentId, req.eventType), fallbackUsed: true }
   }
 
-  const message = groqResponse.text.trim()
+  // Safety net: the model sometimes adds niqqud/cantillation (U+0591–U+05C7), which nobody types in WhatsApp
+  const message = groqResponse.text.replace(/[֑-ׇ]/g, "").trim()
   return { message, fallbackUsed: false }
 }
 
@@ -125,7 +160,8 @@ function buildGeneratePrompt(req: GenerateMessageRequest): string {
   const older = lines.slice(0, -1)
 
   return `${req.personaDescription}
-מצב: ${moodLabel}, ${trustLabel}. נושא: ${req.eventType}.
+מצב: ${moodLabel}, ${trustLabel}.
+מה קרה: ${describeSituation(req)}
 ${older.map((l) => l + "\n").join("")}>>> ${lastMessage}`
 }
 

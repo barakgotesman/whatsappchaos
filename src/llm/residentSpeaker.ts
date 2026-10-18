@@ -29,6 +29,42 @@ let lastMessageAt = 0
  *  that would burst the rate limit and cause all of them to fail */
 let inFlight = false
 
+/** Events that fired but haven't been voiced in chat yet. Without this, an event that fires while
+ *  the speaker is gated (message gap, call in flight, waiting for the player, source on cooldown)
+ *  would silently vanish — the dev panel shows the event but the chat never mentions it. */
+let pendingEvents: SimulationEvent[] = []
+
+/** An unvoiced event goes stale after this many ticks (~36s) — late complaints about old news read wrong */
+const MAX_EVENT_AGE_TICKS = 12
+
+/** Cap on queued events; the most severe/recent are kept */
+const MAX_PENDING_EVENTS = 6
+
+/** Snapshot of events still waiting to be voiced — read-only, for the dev debug report. */
+export function getPendingEvents(): SimulationEvent[] {
+  return [...pendingEvents]
+}
+
+/** True while at least one fresh event still waits to be voiced (lets the caller skip the quiet-tick shortcut). */
+export function hasPendingEvents(tick: number): boolean {
+  return pendingEvents.some((e) => tick - e.tick <= MAX_EVENT_AGE_TICKS)
+}
+
+/**
+ * Adds new events to the queue, drops stale ones, and keeps the list ordered
+ * most-severe-first (ties: newest first) so the loudest issue is voiced next.
+ *
+ * @param events - events fired this tick
+ * @param tick - current tick, used for staleness
+ */
+function enqueueEvents(events: SimulationEvent[], tick: number): void {
+  const known = new Set(pendingEvents.map((e) => e.id))
+  const merged = [...pendingEvents, ...events.filter((e) => !known.has(e.id))]
+    .filter((e) => tick - e.tick <= MAX_EVENT_AGE_TICKS)
+    .sort((a, b) => b.severity - a.severity || b.tick - a.tick)
+  pendingEvents = merged.slice(0, MAX_PENDING_EVENTS)
+}
+
 /** Per-resident last-spoke timestamps — enforces MIN_RESIDENT_COOLDOWN_MS */
 const residentLastSpokeAt = new Map<string, number>()
 
@@ -49,6 +85,10 @@ export async function generateResidentMessages(
   state: BuildingState,
   forceSpeak = false,
 ): Promise<ChatMessage[]> {
+  // Remember this tick's events BEFORE any gate below can bail out, so they get voiced later.
+  // Player-reply turns (forceSpeak) respond to the player, not to the event backlog.
+  if (!forceSpeak) enqueueEvents(events, state.tick)
+
   // Enforce minimum gap — skip unless forceSpeak is set
   if (!forceSpeak && Date.now() - lastMessageAt < MIN_MESSAGE_GAP_MS) return []
   // Skip if a call is already in flight — prevents concurrent Groq requests that burst the rate limit.
@@ -60,7 +100,8 @@ export async function generateResidentMessages(
 
   inFlight = true
   try {
-    const speakers = selectSpeakers(events, residents, state, forceSpeak)
+    // Voice the queued backlog (includes this tick's events); player replies use no event topic
+    const speakers = selectSpeakers(forceSpeak ? events : pendingEvents, residents, state, forceSpeak)
     if (speakers.length === 0) return []
 
     // MAX_SPEAKERS_PER_TICK is 1 so there is always exactly one call
@@ -78,6 +119,9 @@ export async function generateResidentMessages(
     }
 
     if (messages.length > 0) {
+      // Events that got a message are done; the rest stay queued until they go stale
+      const voiced = new Set(messages.map((m) => m.relatedEventId))
+      pendingEvents = pendingEvents.filter((e) => !voiced.has(e.id))
       lastMessageAt = Date.now()
       // Record per-resident cooldown so they don't speak again immediately
       for (const msg of messages) {
@@ -125,9 +169,10 @@ function selectSpeakers(
   for (const event of events) {
     if (selected.length >= MAX_SPEAKERS_PER_TICK) break
     const eligible = active.filter((r) => !used.has(r.id))
-    const resident = event.sourceId === "building"
-      ? eligible.slice().sort((a, b) => b.mood.anger - a.mood.anger)[0]
-      : eligible.find((r) => r.id === event.sourceId)
+    // Source resident speaks if available; if they're on cooldown (or it's a building-level
+    // event) the angriest eligible resident reacts instead, so the event is never left unvoiced.
+    const resident = (event.sourceId !== "building" && eligible.find((r) => r.id === event.sourceId))
+      || eligible.slice().sort((a, b) => b.mood.anger - a.mood.anger)[0]
     if (resident) {
       selected.push({ resident, event })
       used.add(resident.id)
@@ -195,6 +240,7 @@ async function generateForResident(
   residents: Resident[],
 ): Promise<ChatMessage | null> {
   const sourceResident = residents.find((r) => r.id === event.sourceId)
+  const targetResident = event.targetId ? residents.find((r) => r.id === event.targetId) : undefined
   // Last 3 messages as plain strings for LLM context.
   // Replace "אתה" (UI label for the player) with "ועד הבית" so the LLM understands
   // who sent the message — "אתה" is a Hebrew pronoun that means nothing to the model.
@@ -211,6 +257,8 @@ async function generateForResident(
     currentSentiment: resident.currentSentiment,
     eventType: event.type,
     sourceResidentName: sourceResident?.name ?? "דייר",
+    targetResidentName: targetResident?.name,
+    speakerIsSource: event.sourceId === resident.id,
     severity: event.severity,
     activeIssues: state.activeIssues.filter((i) => !i.isResolved).map((i) => i.type),
     recentMessages,

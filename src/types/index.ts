@@ -290,6 +290,8 @@ export interface GenerateMessageRequest {
   currentSentiment: Sentiment
   eventType: EventType
   sourceResidentName: string
+  targetResidentName?: string   // who the event is aimed at (event.targetId), if anyone
+  speakerIsSource: boolean      // false when someone else reacts to the source's event
   severity: number              // 0–100
   activeIssues: IssueType[]
   recentMessages: string[]      // last 5 chat messages as plain strings
