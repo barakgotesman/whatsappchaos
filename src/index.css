@@ -76,9 +76,11 @@
      overflow:visible lets the side buttons (which protrude outside the viewBox) show. */
   .wa-phone {
     @apply relative;
-    height: min(820px, 92vh);
+    /* Single source of truth for phone size: larger = more room for text per line */
+    --phone-h: min(900px, 96vh);
+    height: var(--phone-h);
     /* width = height × (402/874) */
-    width: calc(min(820px, 92vh) * 402 / 874);
+    width: calc(var(--phone-h) * 402 / 874);
   }
 
   /* The SVG itself fills the wrapper */
@@ -99,7 +101,7 @@
     width:  96.517%;  /* (402-14)/402 */
     height: 92.220%;  /* (874-7-54-7)/874 */
     /* Only bottom corners need rounding (top is mid-screen, not at edge) */
-    border-radius: 0 0 calc(min(820px, 92vh) * 0.0629) calc(min(820px, 92vh) * 0.0629);
+    border-radius: 0 0 calc(var(--phone-h) * 0.0629) calc(var(--phone-h) * 0.0629);
     overflow: hidden;
   }
 
@@ -253,7 +255,7 @@
 
   /* ── Input bar ─────────────────────────────────────────── */
   .wa-input-bar {
-    @apply flex items-center gap-2 px-3 py-3 shrink-0;
+    @apply flex items-center gap-1.5 px-2 py-2 shrink-0;
     background: var(--c-surface-low);
     /* padding-bottom slightly larger to not sit on top of home bar */
     padding-bottom: 20px;
@@ -267,7 +269,7 @@
   .wa-input-icon:hover { color: var(--c-primary); }
 
   .wa-input-field {
-    @apply flex-1 flex items-center gap-2 px-3 py-2 rounded-2xl;
+    @apply flex-1 flex items-center gap-1.5 px-2.5 py-2 rounded-2xl;
     background: var(--c-input-field);
     min-width: 0; /* allow flex child to shrink */
   }
@@ -292,7 +294,7 @@
   .wa-textarea::-webkit-scrollbar-thumb:hover { background: var(--c-text); }
 
   .wa-send-btn {
-    @apply flex items-center justify-center w-10 h-10 rounded-full shrink-0
+    @apply flex items-center justify-center w-9 h-9 rounded-full shrink-0
            transition-all active:scale-90 disabled:opacity-40;
     background: var(--c-primary-container);
     color: #003915;
@@ -631,6 +633,15 @@
   }
 
   /* Persistent badge in panel header — always visible when mock is active */
+  /* "Copy report" button in the dev panel header */
+  .dev-report-btn {
+    @apply text-[10px] font-bold px-2.5 py-1 rounded-md tracking-normal transition-colors disabled:opacity-40;
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+  }
+  .dev-report-btn:hover:not(:disabled) { background: #30363d; color: #fff; }
+
   .dev-mock-active-badge {
     @apply text-[10px] font-bold px-2 py-0.5 rounded-full;
     background: #1a4731;

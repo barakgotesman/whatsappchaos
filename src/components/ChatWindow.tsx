@@ -32,14 +32,6 @@ function MoodIcon() {
   )
 }
 
-function AddIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-      <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-    </svg>
-  )
-}
-
 function MicIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -255,12 +247,8 @@ export function ChatWindow({ messages, onSendMessage, disabled, playerSendCount 
         )}
       </div>
 
-      {/* Input bar — matches Stitch: [+] [emoji field] [mic/send] */}
+      {/* Input bar: [emoji field] [mic/send] — no "+" button, to leave room for text on the narrow phone */}
       <div className="wa-input-bar">
-        <button className="wa-input-icon" tabIndex={-1} aria-label="עוד">
-          <AddIcon />
-        </button>
-
         <div className="wa-input-field">
           <span className="wa-input-icon shrink-0" aria-hidden="true">
             <MoodIcon />

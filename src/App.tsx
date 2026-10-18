@@ -10,7 +10,7 @@ import { trace } from "@/dev/traceStore"
 import { DevInjectButton } from "@/components/dev/DevInjectButton"
 import { DevBadge } from "@/components/dev/DevBadge"
 import { DevPanel } from "@/components/dev/DevPanel"
-import { generateResidentMessages } from "@/llm/residentSpeaker"
+import { generateResidentMessages, hasPendingEvents } from "@/llm/residentSpeaker"
 import { analyzeMessage, isLlmCircuitOpen } from "@/llm/groqClient"
 import { SENDER_ID, PLAYER_DISPLAY_NAME, PLAYER_LLM_NAME } from "@/constants"
 
@@ -98,7 +98,8 @@ export default function App() {
   ) {
     // Never fire LLM calls before the player has pressed Start
     if (!isRunningRef.current) return
-    if (events.length === 0 && snapshotState.tick % 3 !== 0) return  // skip quiet ticks
+    // Skip quiet ticks — unless an earlier event is still waiting to be voiced
+    if (events.length === 0 && !hasPendingEvents(snapshotState.tick) && snapshotState.tick % 3 !== 0) return
 
     generateResidentMessages(events, snapshotResidents, snapshotState).then((messages) => {
       if (isLlmCircuitOpen()) { checkLlmFatal(); return }
@@ -306,7 +307,7 @@ export default function App() {
       {/* Dev panel + badge — only when ?dev=1 */}
       {trace.isDevMode() && (
         <>
-          {devPanelOpen && <DevPanel />}
+          {devPanelOpen && <DevPanel state={buildingState} residents={residents} />}
           <DevBadge open={devPanelOpen} onToggle={() => setDevPanelOpen((o) => !o)} />
         </>
       )}

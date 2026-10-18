@@ -8,6 +8,8 @@ import type {
   StateDiffEntry,
 } from "@/dev/traceStore"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { buildDebugReport } from "@/dev/debugReport"
+import type { BuildingState, Resident } from "@/types"
 
 type Tab = "events" | "residents" | "llm" | "diffs"
 
@@ -250,8 +252,33 @@ function moodColor(v: number): string {
  * Right-side dev drawer — only mounted when ?dev=1 and the badge is toggled open.
  * Subscribes to traceStore so it re-renders whenever new data arrives.
  */
-export function DevPanel() {
+export function DevPanel({ state, residents: liveResidents }: { state: BuildingState | null; residents: Resident[] }) {
   const [tab, setTab] = useState<Tab>("events")
+  // Button label state; "copied"/"failed" revert to "idle" after 2s
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle")
+
+  /**
+   * Builds the debug report and puts it on the clipboard so it can be pasted into a chat.
+   * Falls back to a hidden textarea + execCommand where the async clipboard API is blocked.
+   */
+  async function copyReport() {
+    if (!state) return
+    const text = buildDebugReport(state, liveResidents)
+    let ok = false
+    try {
+      await navigator.clipboard.writeText(text)
+      ok = true
+    } catch {
+      const ta = document.createElement("textarea")
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.select()
+      ok = document.execCommand("copy")
+      ta.remove()
+    }
+    setCopyState(ok ? "copied" : "failed")
+    window.setTimeout(() => setCopyState("idle"), 2000)
+  }
 
   // Re-render whenever traceStore emits new data (includes mock mode toggles)
   const [, setRevision] = useState(0)
@@ -270,6 +297,14 @@ export function DevPanel() {
         DEV PANEL
         {/* Persistent badge visible from every tab so mock mode is never forgotten */}
         {mockActive && <span className="dev-mock-active-badge">🤖 MOCK</span>}
+        <button
+          onClick={copyReport}
+          disabled={!state}
+          className="dev-report-btn"
+          title="Copy a debug report (chat, events, LLM calls, state) to paste to Claude"
+        >
+          {copyState === "copied" ? "✓ Copied" : copyState === "failed" ? "Copy failed" : "📋 Copy report"}
+        </button>
       </div>
 
       <div className="dev-tabs">
