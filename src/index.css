@@ -72,13 +72,13 @@
   }
 
   /* ── iPhone SVG frame wrapper ─────────────────────────────
-     The SVG scales by height; width is determined by the 430:932 viewBox.
+     The SVG scales by height; width is determined by the 402:874 viewBox (iPhone 18 Pro).
      overflow:visible lets the side buttons (which protrude outside the viewBox) show. */
   .wa-phone {
     @apply relative;
     height: min(820px, 92vh);
-    /* width = height × (430/932) */
-    width: calc(min(820px, 92vh) * 430 / 932);
+    /* width = height × (402/874) */
+    width: calc(min(820px, 92vh) * 402 / 874);
   }
 
   /* The SVG itself fills the wrapper */
@@ -89,17 +89,17 @@
   }
 
   /* Content layer — sits below the SVG status bar + Dynamic Island strip.
-     SVG coords: screen starts at y=13, status bar height=54 → content at y=67.
-     67/932 = 7.188%  |  bottom inset y=919 → height = (919-67)/932 = 91.416%
-     Horizontal: screen x=13..417 → left=3.023%, width=93.953%              */
+     SVG coords: screen starts at y=7, status bar height=54 → content at y=61.
+     61/874 = 6.979%  |  bottom inset y=867 → height = (867-61)/874 = 92.220%
+     Horizontal: screen x=7..395 → left=1.741%, width=96.517%               */
   .wa-phone-content {
     @apply absolute flex flex-col overflow-hidden;
-    left:   3.023%;   /* 13/430 */
-    top:    7.188%;   /* (13+54)/932  — below status bar + DI */
-    width:  93.953%;  /* (430-26)/430 */
-    height: 91.416%;  /* (932-13-54-13)/932 */
+    left:   1.741%;   /* 7/402 */
+    top:    6.979%;   /* (7+54)/874  — below status bar + DI */
+    width:  96.517%;  /* (402-14)/402 */
+    height: 92.220%;  /* (874-7-54-7)/874 */
     /* Only bottom corners need rounding (top is mid-screen, not at edge) */
-    border-radius: 0 0 calc(min(820px, 92vh) * 0.0472) calc(min(820px, 92vh) * 0.0472);
+    border-radius: 0 0 calc(min(820px, 92vh) * 0.0629) calc(min(820px, 92vh) * 0.0629);
     overflow: hidden;
   }
 
