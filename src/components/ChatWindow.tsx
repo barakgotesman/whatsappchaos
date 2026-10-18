@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react"
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import type { ChatMessage } from "@/types"
@@ -117,6 +117,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
 // ── Chat window ────────────────────────────────────────────────
 
+/** Within this many px of the bottom still counts as "at the bottom" (absorbs sub-pixel/overscroll jitter) */
+const NEAR_BOTTOM_PX = 80
+
 interface ChatWindowProps {
   messages: ChatMessage[]
   onSendMessage: (text: string) => void
@@ -136,21 +139,62 @@ export function ChatWindow({ messages, onSendMessage, disabled, playerSendCount 
   const viewportRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Scroll to bottom when the player sends — always jumps down so the reply is visible
-  useEffect(() => {
-    if (playerSendCount === 0) return
-    const viewport = viewportRef.current
-    if (viewport) viewport.scrollTop = viewport.scrollHeight
-  }, [playerSendCount])
+  // True while the user is reading the bottom of the chat. Kept in a ref (not state) because
+  // it's updated on every scroll event and only read when a new message arrives.
+  const atBottomRef = useRef(true)
+  // True during our own smooth scroll, so its intermediate positions don't count as the user scrolling away
+  const autoScrollingRef = useRef(false)
+  // Messages that arrived while the user was scrolled up — drives the "N new messages" badge
+  const [unread, setUnread] = useState(0)
+  const prevLenRef = useRef(messages.length)
 
-  // Scroll to bottom on new resident messages only if the user is already near the bottom.
-  // If they've scrolled up to read history, leave them alone.
+  /** Scrolls the feed to the newest message and clears the unread badge. */
+  const scrollToBottom = useCallback((smooth: boolean) => {
+    const vp = viewportRef.current
+    if (!vp) return
+    atBottomRef.current = true
+    setUnread(0)
+    if (!smooth) { vp.scrollTop = vp.scrollHeight; return }
+    autoScrollingRef.current = true
+    vp.scrollTo({ top: vp.scrollHeight, behavior: "smooth" })
+    // scrollend isn't universal — release the flag after the animation would have finished
+    window.setTimeout(() => { autoScrollingRef.current = false }, 500)
+  }, [])
+
+  // Track whether the user is at the bottom. Ignored while we're animating the scroll ourselves.
   useEffect(() => {
-    const viewport = viewportRef.current
-    if (!viewport) return
-    const distFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
-    if (distFromBottom < 120) viewport.scrollTop = viewport.scrollHeight
-  }, [messages.length])
+    const vp = viewportRef.current
+    if (!vp) return
+    function onScroll() {
+      if (autoScrollingRef.current) return
+      const dist = vp!.scrollHeight - vp!.scrollTop - vp!.clientHeight
+      const nearBottom = dist < NEAR_BOTTOM_PX
+      atBottomRef.current = nearBottom
+      if (nearBottom) setUnread((n) => (n === 0 ? n : 0))  // reached bottom manually → badge clears
+    }
+    vp.addEventListener("scroll", onScroll, { passive: true })
+    return () => vp.removeEventListener("scroll", onScroll)
+  }, [])
+
+  // Player just sent: always jump to the bottom so their message and the replies are visible
+  useLayoutEffect(() => {
+    if (playerSendCount > 0) scrollToBottom(false)
+  }, [playerSendCount, scrollToBottom])
+
+  // New messages: follow them if the user was at the bottom BEFORE they rendered (the ref holds
+  // that state — measuring after render would count the new bubble's height as "scrolled away").
+  // Otherwise leave the scroll position alone and count them for the badge.
+  useLayoutEffect(() => {
+    const added = messages.length - prevLenRef.current
+    prevLenRef.current = messages.length
+    if (added <= 0) return
+    if (atBottomRef.current) scrollToBottom(true)
+    else {
+      // The player's own bubble is handled by playerSendCount; don't badge it
+      const fresh = messages.slice(-added).filter((m) => m.type !== "player" && m.type !== "system")
+      if (fresh.length) setUnread((n) => n + fresh.length)
+    }
+  }, [messages, scrollToBottom])
 
   // Resize textarea height to fit content, capped at 6 rows
   function resizeTextarea() {
@@ -185,16 +229,31 @@ export function ChatWindow({ messages, onSendMessage, disabled, playerSendCount 
   return (
     <>
       {/* Scrollable message feed — viewport ref needed for manual scroll control */}
-      <ScrollArea className="wa-chat" viewportRef={viewportRef as React.RefObject<HTMLDivElement>}>
-        <div className="wa-messages-inner">
-          {messages.length === 0 && (
-            <div className="wa-empty-state">הקבוצה עדיין שקטה...</div>
-          )}
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
-          ))}
-        </div>
-      </ScrollArea>
+      <div className="wa-chat-wrap">
+        <ScrollArea className="wa-chat" viewportRef={viewportRef as React.RefObject<HTMLDivElement>}>
+          <div className="wa-messages-inner">
+            {messages.length === 0 && (
+              <div className="wa-empty-state">הקבוצה עדיין שקטה...</div>
+            )}
+            {messages.map((msg) => (
+              <MessageBubble key={msg.id} message={msg} />
+            ))}
+          </div>
+        </ScrollArea>
+
+        {/* Shown only when the user scrolled up and new messages arrived below */}
+        {unread > 0 && (
+          <Button
+            onClick={() => scrollToBottom(true)}
+            variant="ghost"
+            className="wa-new-badge"
+            aria-label={`${unread} הודעות חדשות, גלול למטה`}
+          >
+            <span>{unread === 1 ? "הודעה חדשה" : `${unread} הודעות חדשות`}</span>
+            <span aria-hidden="true">↓</span>
+          </Button>
+        )}
+      </div>
 
       {/* Input bar — matches Stitch: [+] [emoji field] [mic/send] */}
       <div className="wa-input-bar">

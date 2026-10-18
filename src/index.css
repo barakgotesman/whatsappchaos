@@ -153,9 +153,25 @@
   /* ── Chat area ─────────────────────────────────────────── */
   .wa-chat {
     @apply flex-1 min-h-0;
-    background: #0b0e11;
+    /* WhatsApp-style doodle wallpaper (public/chat-doodles.svg); solid color shows while it loads.
+       Scrolls with the Root (not the messages), so the pattern stays put behind the bubbles. */
+    background: #0b141a url("/chat-doodles.svg") repeat top left / 260px 260px;
     direction: rtl;
   }
+
+  /* Positioning context for the floating "new messages" badge */
+  .wa-chat-wrap {
+    @apply relative flex flex-col flex-1 min-h-0;
+  }
+
+  /* Floating "N new messages ↓" pill, centered above the input bar */
+  .wa-new-badge {
+    @apply absolute left-1/2 bottom-3 -translate-x-1/2 h-8 px-4 gap-2 rounded-full text-xs font-bold shadow-lg;
+    background: var(--c-primary-container);
+    color: #07210f;
+    animation: wa-badge-in 0.2s ease-out;
+  }
+  .wa-new-badge:hover { background: var(--c-primary); color: #07210f; }
 
   .wa-messages-inner {
     @apply flex flex-col gap-3 px-3 py-4;
@@ -171,6 +187,23 @@
   .wa-bubble-row {
     @apply flex flex-col;
     max-width: 85%;
+    /* New messages pop in like WhatsApp: slide up a few px, scale from the bubble's corner, fade in.
+       Rows are keyed by message id, so only freshly mounted messages animate. */
+    animation: wa-bubble-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  }
+  .wa-bubble-row--in  { transform-origin: top left; }
+  .wa-bubble-row--out { transform-origin: top right; }
+
+  @keyframes wa-bubble-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.92); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes wa-badge-in {
+    from { opacity: 0; transform: translate(-50%, 8px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wa-bubble-row, .wa-new-badge { animation: none; }
   }
   /* RTL context: flex "start" = visual right, "end" = visual left.
      --in (residents) sit on the visual left; --out (player) on the visual right. */
